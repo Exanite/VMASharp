@@ -1,110 +1,90 @@
 ﻿using Silk.NET.Vulkan;
-using System;
 using System.Diagnostics;
-using System.Collections.Generic;
-using System.Text;
-using VMASharp;
 
-namespace VMASharp
+namespace VMASharp;
+
+internal class DedicatedAllocation : Allocation
 {
-    internal class DedicatedAllocation : Allocation
-    {
-        internal DeviceMemory memory;
-        internal IntPtr mappedData;
+    private readonly DeviceMemory _memory;
+    private          IntPtr       _mappedData;
 
-        public DedicatedAllocation(VulkanMemoryAllocator allocator, int memTypeIndex, DeviceMemory memory, SuballocationType suballocType, IntPtr mappedData, long size) : base(allocator, 0)
-        {
-            this.memory = memory;
-            this.mappedData = mappedData;
-            this.memoryTypeIndex = memTypeIndex;
+    public DedicatedAllocation(VulkanMemoryAllocator allocator, int memTypeIndex, DeviceMemory memory,
+        SuballocationType suballocType, IntPtr mappedData, long size) : base(allocator, 0) {
+        _memory = memory;
+        _mappedData = mappedData;
+        MemoryTypeIndex = memTypeIndex;
+    }
+
+    public override DeviceMemory DeviceMemory => _memory;
+
+    public override long Offset {
+        get => 0;
+        internal set => throw new InvalidOperationException();
+    }
+
+    public override IntPtr MappedData => MapCount != 0 ? _mappedData : default;
+
+    internal override bool CanBecomeLost => false;
+
+    internal unsafe Result DedicatedAllocMap(out IntPtr pData) {
+        if (MapCount != 0) {
+            if ((MapCount & int.MaxValue) >= int.MaxValue)
+                throw new InvalidOperationException("Dedicated allocation mapped too many times simultaneously");
+            Debug.Assert(_mappedData != default);
+
+            pData = _mappedData;
+            MapCount += 1;
+
+            return Result.Success;
+
         }
 
-        public override DeviceMemory DeviceMemory => this.memory;
+        pData = default;
 
-        public override long Offset { get => 0; internal set => throw new InvalidOperationException(); }
+        IntPtr tmp;
+        Result res = VkApi.MapMemory(Allocator.Device, _memory, 0, Vk.WholeSize, 0, (void**)&tmp);
 
-        public override IntPtr MappedData => this.mapCount != 0 ? this.mappedData : default;
+        if (res == Result.Success) {
+            _mappedData = tmp;
+            MapCount = 1;
+            pData = tmp;
+        }
 
-        internal override bool CanBecomeLost => false;
+        return res;
+    }
 
-        internal unsafe Result DedicatedAllocMap(out IntPtr pData)
-        {
-            if (this.mapCount != 0)
-            {
-                if ((this.mapCount & int.MaxValue) < int.MaxValue)
-                {
-                    Debug.Assert(this.mappedData != default);
+    internal void DedicatedAllocUnmap() {
+        if ((MapCount & int.MaxValue) != 0) {
+            MapCount -= 1;
 
-                    pData = this.mappedData;
-                    this.mapCount += 1;
-
-                    return Result.Success;
-                }
-                else
-                {
-                    throw new InvalidOperationException("Dedicated allocation mapped too many times simultaneously");
-                }
+            if (MapCount == 0) {
+                _mappedData = default;
+                VkApi.UnmapMemory(Allocator.Device, _memory);
             }
-            else
-            {
-                pData = default;
+        } else {
+            throw new InvalidOperationException("Unmapping dedicated allocation not previously mapped");
+        }
+    }
 
-                IntPtr tmp;
-                var res = VkApi.MapMemory(this.Allocator.Device, this.memory, 0, Vk.WholeSize, 0, (void**)&tmp);
+    public void CalcStatsInfo(out StatInfo stats) {
+        StatInfo.Init(out stats);
+        stats.BlockCount = 1;
+        stats.AllocationCount = 1;
+        stats.UsedBytes = Size;
+        stats.AllocationSizeMin = stats.AllocationSizeMax = Size;
+    }
 
-                if (res == Result.Success)
-                {
-                    this.mappedData = tmp;
-                    this.mapCount = 1;
-                    pData = tmp;
-                }
+    public override IntPtr Map() {
+        Result res = DedicatedAllocMap(out IntPtr pData);
 
-                return res;
-            }
+        if (res != Result.Success) {
+            throw new MapMemoryException(res);
         }
 
-        internal void DedicatedAllocUnmap()
-        {
-            if ((this.mapCount & int.MaxValue) != 0)
-            {
-                this.mapCount -= 1;
+        return pData;
+    }
 
-                if (this.mapCount == 0)
-                {
-                    this.mappedData = default;
-                    VkApi.UnmapMemory(this.Allocator.Device, this.memory);
-                }
-            }
-            else
-            {
-                throw new InvalidOperationException("Unmapping dedicated allocation not previously mapped");
-            }
-        }
-
-        public void CalcStatsInfo(out StatInfo stats)
-        {
-            StatInfo.Init(out stats);
-            stats.BlockCount = 1;
-            stats.AllocationCount = 1;
-            stats.UsedBytes = this.Size;
-            stats.AllocationSizeMin = stats.AllocationSizeMax = this.Size;
-        }
-
-        public override IntPtr Map()
-        {
-            var res = DedicatedAllocMap(out var pData);
-
-            if (res != Result.Success)
-            {
-                throw new MapMemoryException(res);
-            }
-
-            return pData;
-        }
-
-        public override void Unmap()
-        {
-            DedicatedAllocUnmap();
-        }
+    public override void Unmap() {
+        DedicatedAllocUnmap();
     }
 }

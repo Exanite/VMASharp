@@ -1,60 +1,53 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using JetBrains.Annotations;
 using Silk.NET.Vulkan;
-using VMASharp;
 
-namespace VMASharp.Defragmentation
+namespace VMASharp.Defragmentation;
+
+[PublicAPI]
+public sealed class DefragmentationContext : IDisposable
 {
-    public sealed class DefragmentationContext : IDisposable
-    {
-        private readonly VulkanMemoryAllocator Allocator;
-        private readonly uint currentFrame;
-        private readonly uint Flags;
-        private DefragmentationStats Stats;
+    private readonly VulkanMemoryAllocator _allocator;
+    private readonly uint                  _currentFrame;
+    private readonly uint                  _flags;
+    private          DefragmentationStats  _stats;
 
-        private ulong MaxCPUBytesToMove, MaxGPUBytesToMove;
-        private int MaxCPUAllocationsToMove, MaxGPUAllocationsToMove;
+    private ulong _maxCpuBytesToMove,       _maxGpuBytesToMove;
+    private int   _maxCpuAllocationsToMove, _maxGpuAllocationsToMove;
 
-        private readonly BlockListDefragmentationContext[] DefaultPoolContexts = new BlockListDefragmentationContext[Vk.MaxMemoryTypes];
-        private readonly List<BlockListDefragmentationContext> CustomPoolContexts = new List<BlockListDefragmentationContext>();
+    private readonly BlockListDefragmentationContext[] _defaultPoolContexts =
+        new BlockListDefragmentationContext[Vk.MaxMemoryTypes];
+
+    private readonly List<BlockListDefragmentationContext> _customPoolContexts = new();
 
 
-        internal DefragmentationContext(VulkanMemoryAllocator allocator, uint currentFrame, uint flags, DefragmentationStats stats)
-        {
-            throw new NotImplementedException();
-        }
+    internal DefragmentationContext(VulkanMemoryAllocator allocator, uint currentFrame, uint flags,
+        DefragmentationStats stats) {
+        throw new NotImplementedException();
+    }
 
-        public void Dispose()
-        {
-            throw new NotImplementedException();
-        }
+    public void Dispose() {
+        throw new NotImplementedException();
+    }
 
-        internal void AddPools(params VulkanMemoryPool[] Pools)
-        {
-            throw new NotImplementedException();
-        }
+    internal void AddPools(params VulkanMemoryPool[] pools) {
+        throw new NotImplementedException();
+    }
 
-        internal void AddAllocations(Allocation[] allocations, out bool[] allocationsChanged)
-        {
-            throw new NotImplementedException();
-        }
+    internal void AddAllocations(Allocation[] allocations, out bool[] allocationsChanged) {
+        throw new NotImplementedException();
+    }
 
-        internal Result Defragment(ulong maxCPUBytesToMove, int maxCPUAllocationsToMove, ulong maxGPUBytesToMove,
-            int maxGPUAllocationsToMove, CommandBuffer cbuffer, DefragmentationStats stats,
-            DefragmentationFlags flags)
-        {
-            throw new NotImplementedException();
-        }
+    internal Result Defragment(ulong maxCpuBytesToMove, int maxCpuAllocationsToMove, ulong maxGpuBytesToMove,
+        int maxGpuAllocationsToMove, CommandBuffer cbuffer, DefragmentationStats stats,
+        DefragmentationFlags flags) {
+        throw new NotImplementedException();
+    }
 
-        internal Result DefragmentationPassBegin(ref DefragmentationPassMoveInfo[] Info)
-        {
-            throw new NotImplementedException();
-        }
+    internal Result DefragmentationPassBegin(ref DefragmentationPassMoveInfo[] info) {
+        throw new NotImplementedException();
+    }
 
-        internal Result DefragmentationPassEnd()
-        {
-            throw new NotImplementedException();
-        }
+    internal Result DefragmentationPassEnd() {
+        throw new NotImplementedException();
     }
 }
