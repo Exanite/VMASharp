@@ -192,41 +192,41 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
                 break;
             case MemoryUsage.GPU_Only:
                 if (IsIntegratedGpu ||
-                    (preferredFlags & MemoryPropertyFlags.MemoryPropertyHostVisibleBit) == 0) {
-                    preferredFlags |= MemoryPropertyFlags.MemoryPropertyDeviceLocalBit;
+                    (preferredFlags & MemoryPropertyFlags.HostVisibleBit) == 0) {
+                    preferredFlags |= MemoryPropertyFlags.DeviceLocalBit;
                 }
 
                 break;
             case MemoryUsage.CPU_Only:
-                requiredFlags |= MemoryPropertyFlags.MemoryPropertyHostVisibleBit |
-                                 MemoryPropertyFlags.MemoryPropertyHostCoherentBit;
+                requiredFlags |= MemoryPropertyFlags.HostVisibleBit |
+                                 MemoryPropertyFlags.HostCoherentBit;
                 break;
             case MemoryUsage.CPU_To_GPU:
-                requiredFlags |= MemoryPropertyFlags.MemoryPropertyHostVisibleBit;
+                requiredFlags |= MemoryPropertyFlags.HostVisibleBit;
                 if (!IsIntegratedGpu ||
-                    (preferredFlags & MemoryPropertyFlags.MemoryPropertyHostVisibleBit) == 0) {
-                    preferredFlags |= MemoryPropertyFlags.MemoryPropertyDeviceLocalBit;
+                    (preferredFlags & MemoryPropertyFlags.HostVisibleBit) == 0) {
+                    preferredFlags |= MemoryPropertyFlags.DeviceLocalBit;
                 }
 
                 break;
             case MemoryUsage.GPU_To_CPU:
-                requiredFlags |= MemoryPropertyFlags.MemoryPropertyHostVisibleBit;
-                preferredFlags |= MemoryPropertyFlags.MemoryPropertyHostCachedBit;
+                requiredFlags |= MemoryPropertyFlags.HostVisibleBit;
+                preferredFlags |= MemoryPropertyFlags.HostCachedBit;
                 break;
             case MemoryUsage.CPU_Copy:
-                notPreferredFlags |= MemoryPropertyFlags.MemoryPropertyDeviceLocalBit;
+                notPreferredFlags |= MemoryPropertyFlags.DeviceLocalBit;
                 break;
             case MemoryUsage.GPU_LazilyAllocated:
-                requiredFlags |= MemoryPropertyFlags.MemoryPropertyLazilyAllocatedBit;
+                requiredFlags |= MemoryPropertyFlags.LazilyAllocatedBit;
                 break;
             default:
                 throw new ArgumentException("Invalid Usage Flags");
         }
 
         if (((allocInfo.RequiredFlags | allocInfo.PreferredFlags) &
-             (MemoryPropertyFlags.MemoryPropertyDeviceCoherentBitAmd |
-              MemoryPropertyFlags.MemoryPropertyDeviceUncachedBitAmd)) == 0) {
-            notPreferredFlags |= MemoryPropertyFlags.MemoryPropertyDeviceCoherentBitAmd;
+             (MemoryPropertyFlags.DeviceCoherentBitAmd |
+              MemoryPropertyFlags.DeviceUncachedBitAmd)) == 0) {
+            notPreferredFlags |= MemoryPropertyFlags.DeviceCoherentBitAmd;
         }
 
         int? memoryTypeIndex = null;
@@ -327,7 +327,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
     public Allocation AllocateMemoryForBuffer(Buffer buffer, in AllocationCreateInfo createInfo,
         bool bindToBuffer = false) {
         DedicatedAllocationInfo dedicatedInfo = DedicatedAllocationInfo.Default;
-
+    
         dedicatedInfo.DedicatedBuffer = buffer;
 
         GetBufferMemoryRequirements(buffer, out MemoryRequirements memReq,
@@ -383,7 +383,9 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
 
         Allocation? alloc;
 
+
         fixed (BufferCreateInfo* pInfo = &bufferInfo) {
+            pInfo->SType = StructureType.BufferCreateInfo;
             res = VkApi.CreateBuffer(Device, pInfo, null, &buffer);
 
             if (res < 0) {
@@ -448,6 +450,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
         Allocation alloc;
 
         fixed (ImageCreateInfo* pInfo = &imageInfo) {
+            pInfo->SType = StructureType.ImageCreateInfo;
             res = VkApi.CreateImage(Device, pInfo, null, &image);
 
             if (res < 0) {
@@ -492,9 +495,9 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
     }
 
     internal bool IsMemoryTypeNonCoherent(int memTypeIndex) {
-        return (_memoryProperties.MemoryTypes[memTypeIndex].PropertyFlags & (MemoryPropertyFlags.MemoryPropertyHostVisibleBit |
-                                                                             MemoryPropertyFlags.MemoryPropertyHostCoherentBit)) ==
-               MemoryPropertyFlags.MemoryPropertyHostVisibleBit;
+        return (_memoryProperties.MemoryTypes[memTypeIndex].PropertyFlags & (MemoryPropertyFlags.HostVisibleBit |
+                                                                             MemoryPropertyFlags.HostCoherentBit)) ==
+               MemoryPropertyFlags.HostVisibleBit;
     }
 
     internal long GetMemoryTypeMinAlignment(int memTypeIndex) {
@@ -594,7 +597,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
 
             if ((createInfo.Flags & AllocationCreateFlags.Mapped) != 0 &&
                 (_memoryProperties.MemoryTypes[memoryTypeIndex].PropertyFlags &
-                 MemoryPropertyFlags.MemoryPropertyHostVisibleBit) == 0) {
+                 MemoryPropertyFlags.HostVisibleBit) == 0) {
                 infoForPool.Flags &= ~AllocationCreateFlags.Mapped;
             }
 
@@ -937,7 +940,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
     internal void FillAllocation(Allocation allocation, byte pattern) {
         if (!Helpers.DebugInitializeAllocations || allocation.CanBecomeLost ||
             (_memoryProperties.MemoryTypes[allocation.MemoryTypeIndex].PropertyFlags &
-             MemoryPropertyFlags.MemoryPropertyHostVisibleBit) == 0) return;
+             MemoryPropertyFlags.HostVisibleBit) == 0) return;
         IntPtr pData = allocation.Map();
 
         Unsafe.InitBlockUnaligned(ref *(byte*)pData, pattern, (uint)allocation.Size);
@@ -975,7 +978,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
         AllocationCreateInfo finalCreateInfo = createInfo;
 
         if ((finalCreateInfo.Flags & AllocationCreateFlags.Mapped) != 0 &&
-            (_memoryProperties.MemoryTypes[memoryTypeIndex].PropertyFlags & MemoryPropertyFlags.MemoryPropertyHostVisibleBit) == 0) {
+            (_memoryProperties.MemoryTypes[memoryTypeIndex].PropertyFlags & MemoryPropertyFlags.HostVisibleBit) == 0) {
             finalCreateInfo.Flags &= ~AllocationCreateFlags.Mapped;
         }
 
@@ -1089,13 +1092,13 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
             if (dedicatedInfo.DedicatedBuffer.Handle != default) {
                 canContainBufferWithDeviceAddress = dedicatedInfo.DedicatedBufferUsage == UnknownBufferUsage
                                                     || (dedicatedInfo.DedicatedBufferUsage &
-                                                        BufferUsageFlags.BufferUsageShaderDeviceAddressBitKhr) != 0;
+                                                        BufferUsageFlags.ShaderDeviceAddressBitKhr) != 0;
             } else if (dedicatedInfo.DedicatedImage.Handle != default) {
                 canContainBufferWithDeviceAddress = false;
             }
 
             if (canContainBufferWithDeviceAddress) {
-                allocFlagsInfo.Flags = MemoryAllocateFlags.MemoryAllocateDeviceAddressBit;
+                allocFlagsInfo.Flags = MemoryAllocateFlags.AddressBit;
                 allocFlagsInfo.PNext = allocInfo.PNext;
                 allocInfo.PNext = &allocFlagsInfo;
             }
@@ -1149,7 +1152,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
             // Exclude memory types that have VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD.
             for (int index = 0; index < MemoryTypeCount; ++index) {
                 if ((_memoryProperties.MemoryTypes[index].PropertyFlags &
-                     MemoryPropertyFlags.MemoryPropertyDeviceCoherentBitAmd) != 0) {
+                     MemoryPropertyFlags.DeviceCoherentBitAmd) != 0) {
                     memoryTypeBits &= ~(1u << index);
                 }
             }

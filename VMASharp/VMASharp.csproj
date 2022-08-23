@@ -15,9 +15,9 @@
 
     <ItemGroup>
         <PackageReference Include="JetBrains.Annotations" Version="2022.1.0" />
-        <PackageReference Include="Silk.NET.Vulkan" Version="2.5.0" />
-        <PackageReference Include="Silk.NET.Vulkan.Extensions.EXT" Version="2.5.0" />
-        <PackageReference Include="Silk.NET.Vulkan.Extensions.KHR" Version="2.5.0" />
+        <PackageReference Include="Silk.NET.Vulkan" Version="2.16.0" />
+        <PackageReference Include="Silk.NET.Vulkan.Extensions.EXT" Version="2.16.0" />
+        <PackageReference Include="Silk.NET.Vulkan.Extensions.KHR" Version="2.16.0" />
     </ItemGroup>
 
 </Project>

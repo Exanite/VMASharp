@@ -563,7 +563,7 @@ internal class BlockList : IDisposable
         // Every standalone block can potentially contain a buffer with BufferUsageFlags.BufferUsageShaderDeviceAddressBitKhr - always enable the feature
         MemoryAllocateFlagsInfoKHR allocFlagsInfo = new(StructureType.MemoryAllocateFlagsInfoKhr);
         if (Allocator.UseKhrBufferDeviceAddress) {
-            allocFlagsInfo.Flags = MemoryAllocateFlags.MemoryAllocateDeviceAddressBitKhr;
+            allocFlagsInfo.Flags = MemoryAllocateFlags.AddressBitKhr;
             info.PNext = &allocFlagsInfo;
         }
 
