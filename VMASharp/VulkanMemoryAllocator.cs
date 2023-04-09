@@ -11,7 +11,6 @@ using Buffer = Silk.NET.Vulkan.Buffer;
 namespace VMASharp;
 
 using Defragmentation;
-using VMASharp;
 
 [PublicAPI]
 public sealed unsafe class VulkanMemoryAllocator : IDisposable
