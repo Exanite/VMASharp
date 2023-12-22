@@ -20,6 +20,12 @@
         "resolved": "2023.2.0-eap2",
         "contentHash": "sAMoz5FitJuhzcJcJ9qtmzcEWisKW502E8h5Zz9zJhoR9hkzfQlXS9/VGAR+uul+PurjgqK4Y+sVtBCiGCRSAw=="
       },
+      "Nerdbank.GitVersioning": {
+        "type": "Direct",
+        "requested": "[3.6.128, )",
+        "resolved": "3.6.128",
+        "contentHash": "zeA+Ho3XlPgt6P9MRALlkEvfOOzDQdNseV0xia/nSfC1lSrl0+gizlWyixaHvSYUw2ru7pBIKnK451bYOjPRjA=="
+      },
       "NuGetizer": {
         "type": "Direct",
         "requested": "[1.0.2, )",
@@ -31,31 +37,31 @@
       },
       "Silk.NET.Vulkan": {
         "type": "Direct",
-        "requested": "[2.17.1-build3396.0, )",
-        "resolved": "2.17.1-build3396.0",
-        "contentHash": "/f1puaq9XKeHcB/LsQKkkYZVI5/geS5bRs0owCx7LWlMPYsjhSxedo4Mu8gEJNYc/3k6+ugK7uqvuo47KWAZPg==",
+        "requested": "[2.17.1-build3398.0, )",
+        "resolved": "2.17.1-build3398.0",
+        "contentHash": "zXNgxeGAVnebbHT3+zG9FpsL9E2O5gYFMXzlchHytZkFNnpehD5b6RqJ4vHuATkIDBlFQ+9Z/ErIkLjftsQ5Zw==",
         "dependencies": {
-          "Silk.NET.Core": "2.17.1-build3396.0"
+          "Silk.NET.Core": "2.17.1-build3398.0"
         }
       },
       "Silk.NET.Vulkan.Extensions.EXT": {
         "type": "Direct",
-        "requested": "[2.17.1-build3396.0, )",
-        "resolved": "2.17.1-build3396.0",
-        "contentHash": "whgnBC8H/DYQ96EF1cG4vgkKAWPGQmHDRE39Pavk8MQV3Wfilrx5f2cyuH3/YuW9QK+CYRyEccUjLtnPOh2yoA==",
+        "requested": "[2.17.1-build3398.0, )",
+        "resolved": "2.17.1-build3398.0",
+        "contentHash": "yQg+bjd+gC/k5mU2y8h6dKvIKImL4oVomKs7zkHv5F6t81hrvI5VqwpvmgIfUpuhxnSf0U+rXczdAY/7i9M/Eg==",
         "dependencies": {
-          "Silk.NET.Core": "2.17.1-build3396.0",
-          "Silk.NET.Vulkan": "2.17.1-build3396.0"
+          "Silk.NET.Core": "2.17.1-build3398.0",
+          "Silk.NET.Vulkan": "2.17.1-build3398.0"
         }
       },
       "Silk.NET.Vulkan.Extensions.KHR": {
         "type": "Direct",
-        "requested": "[2.17.1-build3396.0, )",
-        "resolved": "2.17.1-build3396.0",
-        "contentHash": "c+LMytPZn9KPwdgXCLGy9+zIukQV69z1Ij9zwrkMHXmMnIz8B/8yLwpBfPBBSvOrjPo4KNl0AG7nvT8bQY5k6w==",
+        "requested": "[2.17.1-build3398.0, )",
+        "resolved": "2.17.1-build3398.0",
+        "contentHash": "RkjUvNMTv7DfhBcXgJ4OasLzvAxgRCBwnt3f0Q5ILENk4jAU3X8HiZ/onvBHrwEKg/oZOq83hVBlvXdg0zmJZA==",
         "dependencies": {
-          "Silk.NET.Core": "2.17.1-build3396.0",
-          "Silk.NET.Vulkan": "2.17.1-build3396.0"
+          "Silk.NET.Core": "2.17.1-build3398.0",
+          "Silk.NET.Vulkan": "2.17.1-build3398.0"
         }
       },
       "ThisAssembly": {
@@ -260,9 +266,9 @@
       },
       "Silk.NET.Core": {
         "type": "CentralTransitive",
-        "requested": "[2.17.1-build3396.0, )",
-        "resolved": "2.17.1-build3396.0",
-        "contentHash": "z+NybcbzzCGssyNwaJhoRWZ/EFOy+utqocHDs6F6Gc67He/SAlXUFVsL2VZ/YQDL8qsyqdmFBs+7hi0nm/yfdA==",
+        "requested": "[2.17.1-build3398.0, )",
+        "resolved": "2.17.1-build3398.0",
+        "contentHash": "KP/ev/a1W8RPnCnZDZmPkNCH3k5aWoDSaDfLKJ1pO1wgm+4k4vqT+RLhEtymgD9Vt8bfdth8BXJpPoe5Ts+zbA==",
         "dependencies": {
           "Microsoft.CSharp": "4.7.0",
           "Microsoft.DotNet.PlatformAbstractions": "3.1.6",
