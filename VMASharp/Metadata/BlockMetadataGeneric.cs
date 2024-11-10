@@ -9,13 +9,13 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
 {
     public long Size { get; }
 
-    private int _freeCount;
+    private int freeCount;
 
-    private readonly LinkedList<Suballocation> _suballocations = new();
+    private readonly LinkedList<Suballocation> suballocations = new();
 
-    private readonly List<LinkedListNode<Suballocation>> _freeSuballocationsBySize = new();
+    private readonly List<LinkedListNode<Suballocation>> freeSuballocationsBySize = new();
 
-    public int AllocationCount => _suballocations.Count - _freeCount;
+    public int AllocationCount => suballocations.Count - freeCount;
 
     public long SumFreeSize { get; private set; }
 
@@ -23,30 +23,30 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
     {
         get
         {
-            var count = _freeSuballocationsBySize.Count;
+            var count = freeSuballocationsBySize.Count;
 
             if (count != 0)
             {
-                return _freeSuballocationsBySize[count - 1].ValueRef.Size;
+                return freeSuballocationsBySize[count - 1].ValueRef.Size;
             }
 
             return 0;
         }
     }
 
-    public bool IsEmpty => _suballocations.Count == 1 && _freeCount == 1;
+    public bool IsEmpty => suballocations.Count == 1 && freeCount == 1;
 
     public BlockMetadataGeneric(long blockSize)
     {
         Size = blockSize;
-        _freeCount = 1;
+        freeCount = 1;
         SumFreeSize = blockSize;
 
         Debug.Assert(blockSize > Helpers.MinFreeSuballocationSizeToRegister);
 
-        var node = _suballocations.AddLast(new Suballocation(0, blockSize));
+        var node = suballocations.AddLast(new Suballocation(0, blockSize));
 
-        _freeSuballocationsBySize.Add(node);
+        freeSuballocationsBySize.Add(node);
     }
 
     public void Alloc(
@@ -63,7 +63,7 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
             throw new InvalidOperationException();
         }
 
-        Debug.Assert(ReferenceEquals(requestNode.List, _suballocations));
+        Debug.Assert(ReferenceEquals(requestNode.List, suballocations));
 
         ref var suballoc = ref requestNode.ValueRef;
 
@@ -85,14 +85,14 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
 
         if (paddingEnd > 0)
         {
-            var newNode = _suballocations.AddAfter(requestNode,
+            var newNode = suballocations.AddAfter(requestNode,
                 new Suballocation(request.Offset + allocSize, paddingEnd));
             RegisterFreeSuballocation(newNode);
         }
 
         if (paddingBegin > 0)
         {
-            var newNode = _suballocations.AddBefore(requestNode,
+            var newNode = suballocations.AddBefore(requestNode,
                 new Suballocation(request.Offset - paddingBegin, paddingBegin));
             RegisterFreeSuballocation(newNode);
         }
@@ -101,12 +101,12 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
         {
             if (paddingEnd > 0)
             {
-                _freeCount += 1;
+                freeCount += 1;
             }
         }
         else if (paddingEnd <= 0)
         {
-            _freeCount -= 1;
+            freeCount -= 1;
         }
 
         SumFreeSize -= allocSize;
@@ -132,17 +132,17 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
         var contextCopy = context;
         contextCopy.CanMakeOtherLost = false;
 
-        var freeSuballocCount = _freeSuballocationsBySize.Count;
+        var freeSuballocCount = freeSuballocationsBySize.Count;
         if (freeSuballocCount > 0)
         {
             if (context.Strategy == AllocationStrategyFlags.BestFit)
             {
-                var index = _freeSuballocationsBySize.FindIndex(
+                var index = freeSuballocationsBySize.FindIndex(
                     context.AllocationSize + 2 * Helpers.DebugMargin, (node, size) => node.ValueRef.Size >= size);
 
                 for (; index < freeSuballocCount; ++index)
                 {
-                    var suballocNode = _freeSuballocationsBySize[index];
+                    var suballocNode = freeSuballocationsBySize[index];
 
                     if (CheckAllocation(in contextCopy, suballocNode, ref request))
                     {
@@ -154,7 +154,7 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
             }
             else if (context.Strategy == Helpers.InternalAllocationStrategyMinOffset)
             {
-                for (var node = _suballocations.First; node != null; node = node.Next)
+                for (var node = suballocations.First; node != null; node = node.Next)
                 {
                     if (node.Value.Type != SuballocationType.Free
                         || !CheckAllocation(in contextCopy, node, ref request))
@@ -171,7 +171,7 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
             {
                 for (var i = freeSuballocCount; i >= 0; --i)
                 {
-                    var item = _freeSuballocationsBySize[i];
+                    var item = freeSuballocationsBySize[i];
 
                     if (!CheckAllocation(in contextCopy, item, ref request))
                     {
@@ -190,7 +190,7 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
             var found = false;
             AllocationRequest tmpRequest = default;
 
-            for (var tNode = _suballocations.First;
+            for (var tNode = suballocations.First;
                 tNode != null;
                 tNode = tNode.Next)
             {
@@ -221,7 +221,7 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
 
     public void Free(BlockAllocation allocation)
     {
-        for (var node = _suballocations.First; node != null; node = node.Next)
+        for (var node = suballocations.First; node != null; node = node.Next)
         {
             ref var suballoc = ref node.ValueRef;
 
@@ -238,7 +238,7 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
 
     public void FreeAtOffset(long offset)
     {
-        for (var node = _suballocations.First; node != null; node = node.Next)
+        for (var node = suballocations.First; node != null; node = node.Next)
         {
             ref var suballoc = ref node.ValueRef;
 
@@ -257,7 +257,7 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
     {
         var lost = 0;
 
-        for (var node = _suballocations.First; node != null; node = node.Next)
+        for (var node = suballocations.First; node != null; node = node.Next)
         {
             ref var suballoc = ref node.ValueRef;
 
@@ -317,14 +317,14 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
 
     public void Validate()
     {
-        Helpers.Validate(_suballocations.Count > 0);
+        Helpers.Validate(suballocations.Count > 0);
 
         long calculatedOffset = 0, calculatedSumFreeSize = 0;
         int calculatedFreeCount = 0, freeSuballocationsToRegister = 0;
 
         var prevFree = false;
 
-        foreach (var subAlloc in _suballocations)
+        foreach (var subAlloc in suballocations)
         {
             Helpers.Validate(subAlloc.Offset == calculatedOffset);
 
@@ -357,13 +357,13 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
             prevFree = currFree;
         }
 
-        Helpers.Validate(_freeSuballocationsBySize.Count == freeSuballocationsToRegister);
+        Helpers.Validate(freeSuballocationsBySize.Count == freeSuballocationsToRegister);
 
         ValidateFreeSuballocationList();
 
         Helpers.Validate(calculatedOffset == Size);
         Helpers.Validate(calculatedSumFreeSize == SumFreeSize);
-        Helpers.Validate(calculatedFreeCount == _freeCount);
+        Helpers.Validate(calculatedFreeCount == freeCount);
     }
 
     [Conditional("DEBUG")]
@@ -371,9 +371,9 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
     {
         long lastSize = 0;
 
-        for (int i = 0, count = _freeSuballocationsBySize.Count; i < count; ++i)
+        for (int i = 0, count = freeSuballocationsBySize.Count; i < count; ++i)
         {
-            var node = _freeSuballocationsBySize[i];
+            var node = freeSuballocationsBySize[i];
 
             Helpers.Validate(node.ValueRef.Type == SuballocationType.Free);
             Helpers.Validate(node.ValueRef.Size >= Helpers.MinFreeSuballocationSizeToRegister);
@@ -625,7 +625,7 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
     private void MergeFreeWithNext(LinkedListNode<Suballocation> node)
     {
         Debug.Assert(node != null);
-        Debug.Assert(ReferenceEquals(node.List, _suballocations));
+        Debug.Assert(ReferenceEquals(node.List, suballocations));
         Debug.Assert(node.ValueRef.Type == SuballocationType.Free);
 
         var nextNode = node.Next;
@@ -636,8 +636,8 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
         ref Suballocation item = ref node.ValueRef, nextItem = ref nextNode.ValueRef;
 
         item.Size += nextItem.Size;
-        _freeCount -= 1;
-        _suballocations.Remove(nextNode);
+        freeCount -= 1;
+        suballocations.Remove(nextNode);
     }
 
     private LinkedListNode<Suballocation> FreeSuballocation(LinkedListNode<Suballocation> item)
@@ -647,7 +647,7 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
         suballoc.Type = SuballocationType.Free;
         suballoc.Allocation = null;
 
-        _freeCount += 1;
+        freeCount += 1;
         SumFreeSize += suballoc.Size;
 
         var nextItem = item.Next;
@@ -682,13 +682,13 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
 
         if (item.Value.Size >= Helpers.MinFreeSuballocationSizeToRegister)
         {
-            if (_freeSuballocationsBySize.Count == 0)
+            if (freeSuballocationsBySize.Count == 0)
             {
-                _freeSuballocationsBySize.Add(item);
+                freeSuballocationsBySize.Add(item);
             }
             else
             {
-                _freeSuballocationsBySize.InsertSorted(item, Helpers.SuballocationNodeItemSizeLess);
+                freeSuballocationsBySize.InsertSorted(item, Helpers.SuballocationNodeItemSizeLess);
             }
         }
 
@@ -702,14 +702,14 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
 
         if (item.ValueRef.Size >= Helpers.MinFreeSuballocationSizeToRegister)
         {
-            var index = _freeSuballocationsBySize.BinarySearch_Leftmost(item,
+            var index = freeSuballocationsBySize.BinarySearch_Leftmost(item,
                 Helpers.SuballocationNodeItemSizeLess);
 
             Debug.Assert(index >= 0);
 
-            while (index < _freeSuballocationsBySize.Count)
+            while (index < freeSuballocationsBySize.Count)
             {
-                var tmp = _freeSuballocationsBySize[index];
+                var tmp = freeSuballocationsBySize[index];
 
                 if (ReferenceEquals(tmp, item))
                 {
@@ -724,7 +724,7 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
                 index += 1;
             }
 
-            _freeSuballocationsBySize.RemoveAt(index);
+            freeSuballocationsBySize.RemoveAt(index);
 
             ValidateFreeSuballocationList();
         }
@@ -736,9 +736,9 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
 
         outInfo.BlockCount = 1;
 
-        var rangeCount = _suballocations.Count;
-        outInfo.AllocationCount = rangeCount - _freeCount;
-        outInfo.UnusedRangeCount = _freeCount;
+        var rangeCount = suballocations.Count;
+        outInfo.AllocationCount = rangeCount - freeCount;
+        outInfo.UnusedRangeCount = freeCount;
 
         outInfo.UnusedBytes = SumFreeSize;
         outInfo.UsedBytes = Size - outInfo.UnusedBytes;
@@ -748,7 +748,7 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
         outInfo.UnusedRangeSizeMin = long.MaxValue;
         outInfo.UnusedRangeSizeMax = 0;
 
-        for (var node = _suballocations.First; node != null; node = node.Next)
+        for (var node = suballocations.First; node != null; node = node.Next)
         {
             ref var item = ref node.ValueRef;
 
@@ -781,15 +781,15 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
 
     public void AddPoolStats(ref PoolStats stats)
     {
-        var rangeCount = _suballocations.Count;
+        var rangeCount = suballocations.Count;
 
         stats.Size += Size;
 
         stats.UnusedSize += SumFreeSize;
 
-        stats.AllocationCount += rangeCount - _freeCount;
+        stats.AllocationCount += rangeCount - freeCount;
 
-        stats.UnusedRangeCount += _freeCount;
+        stats.UnusedRangeCount += freeCount;
 
         var tmp = UnusedRangeSizeMax;
 
@@ -809,7 +809,7 @@ internal sealed class BlockMetadataGeneric : IBlockMetadata
         var minAlignment = long.MaxValue;
         var typeConflict = false;
 
-        for (var node = _suballocations.First; node != null; node = node.Next)
+        for (var node = suballocations.First; node != null; node = node.Next)
         {
             ref var suballoc = ref node.ValueRef;
 

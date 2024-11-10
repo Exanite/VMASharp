@@ -14,16 +14,16 @@ internal class BlockList : IDisposable
 {
     private const int AllocationTryCount = 32;
 
-    private readonly List<VulkanMemoryBlock> _blocks = new();
-    private readonly ReaderWriterLockSlim _mutex = new(LockRecursionPolicy.NoRecursion);
+    private readonly List<VulkanMemoryBlock> blocks = new();
+    private readonly ReaderWriterLockSlim mutex = new(LockRecursionPolicy.NoRecursion);
 
-    private readonly int _minBlockCount, _maxBlockCount;
-    private readonly bool _explicitBlockSize;
+    private readonly int minBlockCount, maxBlockCount;
+    private readonly bool explicitBlockSize;
 
-    private readonly Func<long, IBlockMetadata> _metaObjectCreate;
+    private readonly Func<long, IBlockMetadata> metaObjectCreate;
 
-    private bool _hasEmptyBlock;
-    private uint _nextBlockId;
+    private bool hasEmptyBlock;
+    private uint nextBlockId;
 
     public BlockList(
         VulkanMemoryAllocator allocator,
@@ -41,18 +41,18 @@ internal class BlockList : IDisposable
         ParentPool = pool;
         MemoryTypeIndex = memoryTypeIndex;
         PreferredBlockSize = preferredBlockSize;
-        _minBlockCount = minBlockCount;
-        _maxBlockCount = maxBlockCount;
+        this.minBlockCount = minBlockCount;
+        this.maxBlockCount = maxBlockCount;
         BufferImageGranularity = bufferImageGranularity;
         FrameInUseCount = frameInUseCount;
-        _explicitBlockSize = explicitBlockSize;
+        this.explicitBlockSize = explicitBlockSize;
 
-        _metaObjectCreate = algorithm;
+        metaObjectCreate = algorithm;
     }
 
     public void Dispose()
     {
-        foreach (var block in _blocks)
+        foreach (var block in blocks)
         {
             block.Dispose();
         }
@@ -76,30 +76,30 @@ internal class BlockList : IDisposable
     {
         get
         {
-            _mutex.EnterReadLock();
+            mutex.EnterReadLock();
 
             try
             {
-                return _blocks.Count == 0;
+                return blocks.Count == 0;
             }
             finally
             {
-                _mutex.ExitReadLock();
+                mutex.ExitReadLock();
             }
         }
     }
 
     public bool IsCorruptedDetectionEnabled => false;
 
-    public int BlockCount => _blocks.Count;
+    public int BlockCount => blocks.Count;
 
-    public VulkanMemoryBlock this[int index] => _blocks[index];
+    public VulkanMemoryBlock this[int index] => blocks[index];
 
     private IEnumerable<VulkanMemoryBlock> BlocksInReverse //Just gonna take advantage of C#...
     {
         get
         {
-            var localList = _blocks;
+            var localList = blocks;
 
             for (var index = localList.Count - 1; index >= 0; --index)
             {
@@ -110,12 +110,12 @@ internal class BlockList : IDisposable
 
     public void CreateMinBlocks()
     {
-        if (_blocks.Count > 0)
+        if (blocks.Count > 0)
         {
             throw new InvalidOperationException("Block list not empty");
         }
 
-        for (var i = 0; i < _minBlockCount; ++i)
+        for (var i = 0; i < minBlockCount; ++i)
         {
             var res = CreateBlock(PreferredBlockSize, out _);
 
@@ -128,14 +128,14 @@ internal class BlockList : IDisposable
 
     public void GetPoolStats(out PoolStats stats)
     {
-        _mutex.EnterReadLock();
+        mutex.EnterReadLock();
 
         try
         {
             stats = new PoolStats();
-            stats.BlockCount = _blocks.Count;
+            stats.BlockCount = blocks.Count;
 
-            foreach (var block in _blocks)
+            foreach (var block in blocks)
             {
                 Debug.Assert(block != null);
 
@@ -146,7 +146,7 @@ internal class BlockList : IDisposable
         }
         finally
         {
-            _mutex.ExitReadLock();
+            mutex.ExitReadLock();
         }
     }
 
@@ -157,7 +157,7 @@ internal class BlockList : IDisposable
         in AllocationCreateInfo allocInfo,
         SuballocationType suballocType)
     {
-        _mutex.EnterWriteLock();
+        mutex.EnterWriteLock();
 
         try
         {
@@ -165,7 +165,7 @@ internal class BlockList : IDisposable
         }
         finally
         {
-            _mutex.ExitWriteLock();
+            mutex.ExitWriteLock();
         }
     }
 
@@ -180,7 +180,7 @@ internal class BlockList : IDisposable
             budgetExceeded = budget.Usage >= budget.Budget;
         }
 
-        _mutex.EnterWriteLock();
+        mutex.EnterWriteLock();
 
         try
         {
@@ -199,24 +199,24 @@ internal class BlockList : IDisposable
 
             block.Validate();
 
-            var canDeleteBlock = _blocks.Count > _minBlockCount;
+            var canDeleteBlock = blocks.Count > minBlockCount;
 
             if (block.MetaData.IsEmpty)
             {
-                if ((_hasEmptyBlock || budgetExceeded) && canDeleteBlock)
+                if ((hasEmptyBlock || budgetExceeded) && canDeleteBlock)
                 {
                     blockToDelete = block;
                     Remove(block);
                 }
             }
-            else if (_hasEmptyBlock && canDeleteBlock)
+            else if (hasEmptyBlock && canDeleteBlock)
             {
-                block = _blocks[^1];
+                block = blocks[^1];
 
                 if (block.MetaData.IsEmpty)
                 {
                     blockToDelete = block;
-                    _blocks.RemoveAt(_blocks.Count - 1);
+                    blocks.RemoveAt(blocks.Count - 1);
                 }
             }
 
@@ -225,7 +225,7 @@ internal class BlockList : IDisposable
         }
         finally
         {
-            _mutex.ExitWriteLock();
+            mutex.ExitWriteLock();
         }
 
         if (blockToDelete != null)
@@ -239,11 +239,11 @@ internal class BlockList : IDisposable
         var memTypeIndex = MemoryTypeIndex;
         var memHeapIndex = Allocator.MemoryTypeIndexToHeapIndex(memTypeIndex);
 
-        _mutex.EnterReadLock();
+        mutex.EnterReadLock();
 
         try
         {
-            foreach (var block in _blocks)
+            foreach (var block in blocks)
             {
                 Debug.Assert(block != null);
                 block.Validate();
@@ -256,7 +256,7 @@ internal class BlockList : IDisposable
         }
         finally
         {
-            _mutex.ExitReadLock();
+            mutex.ExitReadLock();
         }
     }
 
@@ -268,13 +268,13 @@ internal class BlockList : IDisposable
     /// </returns>
     public int MakePoolAllocationsLost(int currentFrame)
     {
-        _mutex.EnterWriteLock();
+        mutex.EnterWriteLock();
 
         try
         {
             var lostAllocationCount = 0;
 
-            foreach (var block in _blocks)
+            foreach (var block in blocks)
             {
                 Debug.Assert(block != null);
 
@@ -285,7 +285,7 @@ internal class BlockList : IDisposable
         }
         finally
         {
-            _mutex.ExitWriteLock();
+            mutex.ExitWriteLock();
         }
     }
 
@@ -296,7 +296,7 @@ internal class BlockList : IDisposable
 
     public int CalcAllocationCount()
     {
-        return _blocks.Sum(block => block.MetaData.AllocationCount);
+        return blocks.Sum(block => block.MetaData.AllocationCount);
     }
 
     public bool IsBufferImageGranularityConflictPossible()
@@ -308,7 +308,7 @@ internal class BlockList : IDisposable
 
         var lastSuballocType = SuballocationType.Free;
 
-        foreach (var block in _blocks)
+        foreach (var block in blocks)
         {
             var metadata = block.MetaData as BlockMetadataGeneric;
             Debug.Assert(metadata != null);
@@ -327,9 +327,9 @@ internal class BlockList : IDisposable
     {
         long result = 0;
 
-        for (var i = _blocks.Count - 1; i >= 0; --i)
+        for (var i = blocks.Count - 1; i >= 0; --i)
         {
-            var blockSize = _blocks[i].MetaData.Size;
+            var blockSize = blocks[i].MetaData.Size;
 
             if (result < blockSize)
             {
@@ -368,7 +368,7 @@ internal class BlockList : IDisposable
 
         var canFallbackToDedicated = !IsCustomPool;
         var canCreateNewBlock = (createInfo.Flags & AllocationCreateFlags.NeverAllocate) == 0 &&
-            _blocks.Count < _maxBlockCount &&
+            blocks.Count < maxBlockCount &&
             (freeMemory >= size || !canFallbackToDedicated);
 
         var strategy = createInfo.Strategy;
@@ -420,7 +420,7 @@ internal class BlockList : IDisposable
 
             if (strategy == AllocationStrategyFlags.BestFit)
             {
-                foreach (var block in _blocks)
+                foreach (var block in blocks)
                 {
                     alloc = AllocateFromBlock(block, in context, allocFlagsCopy, createInfo.UserData);
 
@@ -454,7 +454,7 @@ internal class BlockList : IDisposable
             var newBlockSizeShift = 0;
             const int newBlockSizeShiftMax = 3;
 
-            if (!_explicitBlockSize)
+            if (!explicitBlockSize)
             {
                 var maxExistingBlockSize = CalcMaxBlockSize();
 
@@ -479,7 +479,7 @@ internal class BlockList : IDisposable
                 ? CreateBlock(newBlockSize, out newBlockIndex)
                 : Result.ErrorOutOfDeviceMemory;
 
-            if (!_explicitBlockSize)
+            if (!explicitBlockSize)
             {
                 while (res < 0 && newBlockSizeShift < newBlockSizeShiftMax)
                 {
@@ -502,7 +502,7 @@ internal class BlockList : IDisposable
 
             if (res == Result.Success)
             {
-                var block = _blocks[newBlockIndex];
+                var block = blocks[newBlockIndex];
 
                 alloc = AllocateFromBlock(block, in context, allocFlagsCopy, createInfo.UserData);
 
@@ -528,7 +528,7 @@ internal class BlockList : IDisposable
 
                 if (strategy == AllocationStrategyFlags.BestFit)
                 {
-                    foreach (var curBlock in _blocks)
+                    foreach (var curBlock in blocks)
                     {
                         if (curBlock.MetaData.TryCreateAllocationRequest(in context, out var request))
                         {
@@ -693,34 +693,34 @@ internal class BlockList : IDisposable
             return res;
         }
 
-        var metaObject = _metaObjectCreate(blockSize);
+        var metaObject = metaObjectCreate(blockSize);
 
         if (metaObject.Size != blockSize)
         {
             throw new InvalidOperationException("Returned Metadata object reports incorrect block size");
         }
 
-        VulkanMemoryBlock block = new(Allocator, ParentPool, MemoryTypeIndex, mem, _nextBlockId++, metaObject);
+        VulkanMemoryBlock block = new(Allocator, ParentPool, MemoryTypeIndex, mem, nextBlockId++, metaObject);
 
-        _blocks.Add(block);
+        blocks.Add(block);
 
-        newBlockIndex = _blocks.Count - 1;
+        newBlockIndex = blocks.Count - 1;
 
         return Result.Success;
     }
 
     private void FreeEmptyBlocks(ref DefragmentationStats stats)
     {
-        for (var i = _blocks.Count - 1; i >= 0; --i)
+        for (var i = blocks.Count - 1; i >= 0; --i)
         {
-            var block = _blocks[i];
+            var block = blocks[i];
 
             if (!block.MetaData.IsEmpty)
             {
                 continue;
             }
 
-            if (_blocks.Count <= _minBlockCount)
+            if (blocks.Count <= minBlockCount)
             {
                 break;
             }
@@ -728,7 +728,7 @@ internal class BlockList : IDisposable
             stats.DeviceMemoryBlocksFreed += 1;
             stats.BytesFreed += block.MetaData.Size;
 
-            _blocks.RemoveAt(i);
+            blocks.RemoveAt(i);
             block.Dispose();
         }
 
@@ -737,47 +737,47 @@ internal class BlockList : IDisposable
 
     private void UpdateHasEmptyBlock()
     {
-        _hasEmptyBlock = _blocks.Any(b => !b.MetaData.IsEmpty);
+        hasEmptyBlock = blocks.Any(b => !b.MetaData.IsEmpty);
     }
 
     private void Remove(VulkanMemoryBlock block)
     {
-        var res = _blocks.Remove(block);
+        var res = blocks.Remove(block);
         Debug.Assert(res, "");
     }
 
     private void IncrementallySortBlocks()
     {
-        if (_blocks.Count > 1)
+        if (blocks.Count > 1)
         {
-            var prevBlock = _blocks[0];
+            var prevBlock = blocks[0];
             var i = 1;
 
             do
             {
-                var curBlock = _blocks[i];
+                var curBlock = blocks[i];
 
                 if (prevBlock.MetaData.SumFreeSize > curBlock.MetaData.SumFreeSize)
                 {
-                    _blocks[i - 1] = curBlock;
-                    _blocks[i] = prevBlock;
+                    blocks[i - 1] = curBlock;
+                    blocks[i] = prevBlock;
 
                     return;
                 }
 
                 prevBlock = curBlock;
                 i += 1;
-            } while (i < _blocks.Count);
+            } while (i < blocks.Count);
         }
     }
 
     public class DefragmentationContext
     {
-        private readonly BlockList _list;
+        private readonly BlockList list;
 
         public DefragmentationContext(BlockList list)
         {
-            _list = list;
+            this.list = list;
         }
 
         //public void Defragment(DefragmentationStats stats, DefragmentationFlags flags, ulong maxCpuBytesToMove, )

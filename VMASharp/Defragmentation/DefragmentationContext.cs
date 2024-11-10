@@ -6,18 +6,18 @@ namespace VMASharp.Defragmentation;
 
 public sealed class DefragmentationContext : IDisposable
 {
-    private readonly VulkanMemoryAllocator _allocator;
-    private readonly uint _currentFrame;
-    private readonly uint _flags;
-    private DefragmentationStats _stats;
+    private readonly VulkanMemoryAllocator allocator;
+    private readonly uint currentFrame;
+    private readonly uint flags;
+    private DefragmentationStats stats;
 
-    private ulong _maxCpuBytesToMove, _maxGpuBytesToMove;
-    private int _maxCpuAllocationsToMove, _maxGpuAllocationsToMove;
+    private ulong maxCpuBytesToMove, maxGpuBytesToMove;
+    private int maxCpuAllocationsToMove, maxGpuAllocationsToMove;
 
-    private readonly BlockListDefragmentationContext[] _defaultPoolContexts =
+    private readonly BlockListDefragmentationContext[] defaultPoolContexts =
         new BlockListDefragmentationContext[Vk.MaxMemoryTypes];
 
-    private readonly List<BlockListDefragmentationContext> _customPoolContexts = new();
+    private readonly List<BlockListDefragmentationContext> customPoolContexts = new();
 
     internal DefragmentationContext(
         VulkanMemoryAllocator allocator,

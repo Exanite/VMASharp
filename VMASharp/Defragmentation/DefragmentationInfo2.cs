@@ -12,13 +12,13 @@ public struct DefragmentationInfo2
 
     public VulkanMemoryPool[] Pools;
 
-    public ulong MaxCPUBytesToMove;
+    public ulong MaxCpuBytesToMove;
 
-    public int MaxCPUAllocationsToMove;
+    public int MaxCpuAllocationsToMove;
 
-    public ulong MaxGPUBytesToMove;
+    public ulong MaxGpuBytesToMove;
 
-    public int MaxGPUAllocationsToMove;
+    public int MaxGpuAllocationsToMove;
 
     public CommandBuffer CommandBuffer;
 }

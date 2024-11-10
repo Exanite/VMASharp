@@ -11,15 +11,15 @@ public class CameraUniform
         0.0f, 0.0f, 0.5f, 0.0f,
         0.0f, 0.0f, 0.5f, 1.0f);
 
-    private Matrix4x4 Projection, View, MVP;
+    private Matrix4x4 projection, view, mvp;
 
     public CameraUniform()
     {
-        Projection = Matrix4x4.Identity;
-        View = Matrix4x4.Identity;
+        projection = Matrix4x4.Identity;
+        view = Matrix4x4.Identity;
     }
 
-    public ref readonly Matrix4x4 MVPMatrix => ref MVP;
+    public ref readonly Matrix4x4 MvpMatrix => ref mvp;
 
     public void PerspectiveDegrees(float fieldOfViewDegrees, float aspectRatio, float nearPlaneDistance, float farPlaneDistance)
     {
@@ -28,22 +28,22 @@ public class CameraUniform
 
     public void Perspective(float fieldOfView, float aspectRatio, float nearPlaneDistance, float farPlaneDistance)
     {
-        Projection = Matrix4x4.CreatePerspectiveFieldOfView(fieldOfView, aspectRatio, nearPlaneDistance, farPlaneDistance);
+        projection = Matrix4x4.CreatePerspectiveFieldOfView(fieldOfView, aspectRatio, nearPlaneDistance, farPlaneDistance);
     }
 
     public void LookAt(Vector3 cameraPosition, Vector3 cameraTarget, Vector3 cameraUpVector)
     {
-        View = glmCreateLookAt(cameraPosition, cameraTarget, cameraUpVector);
+        view = GlmCreateLookAt(cameraPosition, cameraTarget, cameraUpVector);
     }
 
-    public void UpdateMVP()
+    public void UpdateMvp()
     {
-        MVP = View * Projection * VulkanClip;
+        mvp = view * projection * VulkanClip;
     }
 
     //Necessary because Matrix4x4.CreateLookAt() does not properly handle translation
     //Ported from the GLM Mathematics library
-    private static Matrix4x4 glmCreateLookAt(Vector3 cameraPosition, Vector3 cameraTarget, Vector3 cameraUpVector)
+    private static Matrix4x4 GlmCreateLookAt(Vector3 cameraPosition, Vector3 cameraTarget, Vector3 cameraUpVector)
     {
         var f = Vector3.Normalize(cameraTarget - cameraPosition);
         var s = Vector3.Normalize(Vector3.Cross(f, cameraUpVector));

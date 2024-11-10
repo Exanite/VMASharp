@@ -23,7 +23,7 @@ public enum MemoryUsage
     /// In such case, you are free to map it.
     /// You can use #VMA_ALLOCATION_CREATE_MAPPED_BIT with this usage type.
     /// </remarks>
-    GPU_Only,
+    GpuOnly,
 
     /// <summary>
     /// Memory will be mappable on host.
@@ -36,7 +36,7 @@ public enum MemoryUsage
     /// <remarks>
     /// Usage: Staging copy of resources used as transfer source.
     /// </remarks>
-    CPU_Only,
+    CpuOnly,
 
     /// <summary>
     /// Memory that is mappable on host (guarantees to be `HOST_VISIBLE`) and preferably fast to access by GPU.
@@ -46,7 +46,7 @@ public enum MemoryUsage
     /// Usage: Resources written frequently by host (dynamic), read by device. E.g. textures, vertex buffers, uniform buffers
     /// updated every frame or every draw call.
     /// </remarks>
-    CPU_To_GPU,
+    CpuToGpu,
 
     /// <summary>
     /// Memory mappable on host (guarantees to be `HOST_VISIBLE`) and cached.
@@ -59,7 +59,7 @@ public enum MemoryUsage
     ///     - Any resources read or accessed randomly on host, e.g. CPU-side copy of vertex buffer used as source of transfer,
     /// but also used for collision detection.
     /// </remarks>
-    GPU_To_CPU,
+    GpuToCpu,
 
     /// <summary>
     /// CPU memory - memory that is preferably not `DEVICE_LOCAL`, but also not guaranteed to be `HOST_VISIBLE`.
@@ -68,7 +68,7 @@ public enum MemoryUsage
     /// Usage: Staging copy of resources moved from GPU memory to CPU memory as part
     /// of custom paging/residency mechanism, to be moved back to GPU memory when needed.
     /// </remarks>
-    CPU_Copy,
+    CpuCopy,
 
     /// <summary>
     /// Lazily allocated GPU memory having `VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT`.
@@ -80,5 +80,5 @@ public enum MemoryUsage
     /// Usage: Memory for transient attachment images (color attachments, depth attachments etc.), created with
     /// `VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT`.
     /// </remarks>
-    GPU_LazilyAllocated,
+    GpuLazilyAllocated,
 }

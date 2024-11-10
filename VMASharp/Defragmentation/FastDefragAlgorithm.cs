@@ -63,13 +63,13 @@ internal sealed class FastDefragAlgorithm : DefragmentationAlgorithm
     {
         private const int MaxCount = 4;
 
-        private FreeSpace[] FreeSpaces = new FreeSpace[MaxCount];
+        private FreeSpace[] freeSpaces = new FreeSpace[MaxCount];
 
         public FreeSpaceDatabase()
         {
-            for (var i = 0; i < FreeSpaces.Length; ++i)
+            for (var i = 0; i < freeSpaces.Length; ++i)
             {
-                FreeSpaces[i].BlockInfoIndex = -1;
+                freeSpaces[i].BlockInfoIndex = -1;
             }
         }
 
@@ -81,9 +81,9 @@ internal sealed class FastDefragAlgorithm : DefragmentationAlgorithm
             }
 
             var bestIndex = -1;
-            for (var i = 0; i < FreeSpaces.Length; ++i)
+            for (var i = 0; i < freeSpaces.Length; ++i)
             {
-                ref var space = ref FreeSpaces[i];
+                ref var space = ref freeSpaces[i];
 
                 if (space.BlockInfoIndex == -1)
                 {
@@ -92,7 +92,7 @@ internal sealed class FastDefragAlgorithm : DefragmentationAlgorithm
                     break;
                 }
 
-                if (space.Size < size && (bestIndex == -1 || space.Size < FreeSpaces[bestIndex].Size))
+                if (space.Size < size && (bestIndex == -1 || space.Size < freeSpaces[bestIndex].Size))
                 {
                     bestIndex = i;
                 }
@@ -100,7 +100,7 @@ internal sealed class FastDefragAlgorithm : DefragmentationAlgorithm
 
             if (bestIndex != -1)
             {
-                ref var bestSpace = ref FreeSpaces[bestIndex];
+                ref var bestSpace = ref freeSpaces[bestIndex];
 
                 bestSpace.BlockInfoIndex = blockInfoIndex;
                 bestSpace.Offset = offset;
@@ -113,9 +113,9 @@ internal sealed class FastDefragAlgorithm : DefragmentationAlgorithm
             var bestIndex = -1;
             long bestFreeSpaceAfter = 0;
 
-            for (var i = 0; i < FreeSpaces.Length; ++i)
+            for (var i = 0; i < freeSpaces.Length; ++i)
             {
-                ref var space = ref FreeSpaces[i];
+                ref var space = ref freeSpaces[i];
 
                 if (space.BlockInfoIndex == -1)
                 {
@@ -138,7 +138,7 @@ internal sealed class FastDefragAlgorithm : DefragmentationAlgorithm
 
             if (bestIndex != -1)
             {
-                ref var bestSpace = ref FreeSpaces[bestIndex];
+                ref var bestSpace = ref freeSpaces[bestIndex];
 
                 blockInfoIndex = bestSpace.BlockInfoIndex;
                 destOffset = Helpers.AlignUp(bestSpace.Offset, alignment);

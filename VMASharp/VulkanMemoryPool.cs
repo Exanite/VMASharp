@@ -5,18 +5,18 @@ using Silk.NET.Vulkan;
 
 namespace VMASharp;
 
-[PublicAPI]
+[PublicApi]
 public sealed class VulkanMemoryPool : IDisposable
 {
-    [PublicAPI]
+    [PublicApi]
     public VulkanMemoryAllocator Allocator { get; }
 
     private Vk VkApi => Allocator.VkApi;
 
-    [PublicAPI]
+    [PublicApi]
     public string? Name { get; set; }
 
-    internal uint ID { get; }
+    internal uint Id { get; }
 
     internal readonly BlockList BlockList;
 
@@ -34,9 +34,9 @@ public sealed class VulkanMemoryPool : IDisposable
 
         ref var tmpRef = ref Unsafe.As<uint, int>(ref allocator.NextPoolId);
 
-        ID = (uint)Interlocked.Increment(ref tmpRef);
+        Id = (uint)Interlocked.Increment(ref tmpRef);
 
-        if (ID == 0)
+        if (Id == 0)
         {
             throw new OverflowException();
         }
@@ -58,25 +58,25 @@ public sealed class VulkanMemoryPool : IDisposable
         BlockList.CreateMinBlocks();
     }
 
-    [PublicAPI]
+    [PublicApi]
     public void Dispose()
     {
         Allocator.DestroyPool(this);
     }
 
-    [PublicAPI]
+    [PublicApi]
     public int MakeAllocationsLost()
     {
         return Allocator.MakePoolAllocationsLost(this);
     }
 
-    [PublicAPI]
+    [PublicApi]
     public Result CheckForCorruption()
     {
         return Allocator.CheckPoolCorruption(this);
     }
 
-    [PublicAPI]
+    [PublicApi]
     public void GetPoolStats(out PoolStats stats)
     {
         Allocator.GetPoolStats(this, out stats);

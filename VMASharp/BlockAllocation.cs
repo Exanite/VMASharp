@@ -8,7 +8,7 @@ public sealed class BlockAllocation : Allocation
 {
     internal VulkanMemoryBlock Block = null!;
     internal SuballocationType SuballocationType;
-    private bool _canBecomeLost;
+    private bool canBecomeLost;
 
     internal BlockAllocation(VulkanMemoryAllocator allocator, int currentFrameIndex) : base(allocator,
         currentFrameIndex) {}
@@ -34,7 +34,7 @@ public sealed class BlockAllocation : Allocation
         }
     }
 
-    internal override bool CanBecomeLost => _canBecomeLost;
+    internal override bool CanBecomeLost => canBecomeLost;
 
     internal void InitBlockAllocation(
         VulkanMemoryBlock block,
@@ -53,7 +53,7 @@ public sealed class BlockAllocation : Allocation
         MemoryTypeIndex = memoryTypeIndex;
         MapCount = mapped ? int.MinValue : 0;
         SuballocationType = subType;
-        _canBecomeLost = canBecomeLost;
+        this.canBecomeLost = canBecomeLost;
     }
 
     internal void ChangeAllocation(VulkanMemoryBlock block, long offset)

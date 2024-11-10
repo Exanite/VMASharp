@@ -176,11 +176,11 @@ public static class VertexData
 
     private delegate bool VertexCompareEqual(ref PositionColorVertex v0, ref PositionColorVertex v1);
 
-    private static readonly VertexCompareEqual _defaultCompareEqual = (ref PositionColorVertex v0, ref PositionColorVertex v1) => v0.Position == v1.Position;
+    private static readonly VertexCompareEqual DefaultCompareEqual = (ref PositionColorVertex v0, ref PositionColorVertex v1) => v0.Position == v1.Position;
 
     private static (PositionColorVertex[], ushort[]) ConvertToIndexedData(PositionColorVertex[] data, VertexCompareEqual? compare = null)
     {
-        compare ??= _defaultCompareEqual;
+        compare ??= DefaultCompareEqual;
 
         var indexedData = new PositionColorVertex[data.Length];
         var indexData = new ushort[data.Length];

@@ -8,11 +8,11 @@ public sealed unsafe class DrawCubeExample : GraphicsPipelineExample
 {
     public const int MaxFramesInFlight = 2;
 
-    private CommandBuffer[] SecondaryCommandBuffers;
+    private CommandBuffer[] secondaryCommandBuffers;
 
-    private readonly FrameCommandContext[] FrameContexts = new FrameCommandContext[MaxFramesInFlight];
+    private readonly FrameCommandContext[] frameContexts = new FrameCommandContext[MaxFramesInFlight];
 
-    private int CurrentFrame = 0;
+    private int currentFrame = 0;
 
     public DrawCubeExample()
     {
@@ -41,7 +41,7 @@ public sealed unsafe class DrawCubeExample : GraphicsPipelineExample
 
         for (var i = 0; i < MaxFramesInFlight; ++i)
         {
-            ref var ctx = ref FrameContexts[i];
+            ref var ctx = ref frameContexts[i];
 
             primarys[i] = ctx.CmdBuffer;
 
@@ -53,9 +53,9 @@ public sealed unsafe class DrawCubeExample : GraphicsPipelineExample
 
         VkApi.FreeCommandBuffers(Device, CommandPool, MaxFramesInFlight, primarys);
 
-        fixed (CommandBuffer* cbuffers = SecondaryCommandBuffers)
+        fixed (CommandBuffer* cbuffers = secondaryCommandBuffers)
         {
-            VkApi.FreeCommandBuffers(Device, CommandPool, (uint)FrameContexts.Length, cbuffers);
+            VkApi.FreeCommandBuffers(Device, CommandPool, (uint)frameContexts.Length, cbuffers);
         }
 
         base.Dispose();
@@ -63,7 +63,7 @@ public sealed unsafe class DrawCubeExample : GraphicsPipelineExample
 
     private void DrawFrame(double dTime)
     {
-        ref var ctx = ref FrameContexts[CurrentFrame];
+        ref var ctx = ref frameContexts[currentFrame];
 
         //Wait for a previous render operation to finish
         VkApi.WaitForFences(Device, 1, in ctx.Fence, true, ulong.MaxValue);
@@ -121,15 +121,15 @@ public sealed unsafe class DrawCubeExample : GraphicsPipelineExample
             VkSwapchain.QueuePresent(PresentQueue, &presentInfo);
         }
 
-        CurrentFrame = (CurrentFrame + 1) % MaxFramesInFlight;
-        Allocator.CurrentFrameIndex = CurrentFrame;
+        currentFrame = (currentFrame + 1) % MaxFramesInFlight;
+        Allocator.CurrentFrameIndex = currentFrame;
     }
 
     private void RecordSecondaryCommandBuffers()
     {
         const uint secondaryCommandBufferCount = 1;
 
-        SecondaryCommandBuffers = new CommandBuffer[secondaryCommandBufferCount];
+        secondaryCommandBuffers = new CommandBuffer[secondaryCommandBufferCount];
 
         var allocInfo = new CommandBufferAllocateInfo
         {
@@ -139,7 +139,7 @@ public sealed unsafe class DrawCubeExample : GraphicsPipelineExample
             CommandBufferCount = secondaryCommandBufferCount,
         };
 
-        fixed (CommandBuffer* commandBuffers = SecondaryCommandBuffers)
+        fixed (CommandBuffer* commandBuffers = secondaryCommandBuffers)
         {
             var res = VkApi.AllocateCommandBuffers(Device, &allocInfo, commandBuffers);
 
@@ -165,35 +165,35 @@ public sealed unsafe class DrawCubeExample : GraphicsPipelineExample
 
         const CommandBufferUsageFlags usageFlags = CommandBufferUsageFlags.CommandBufferUsageRenderPassContinueBit | CommandBufferUsageFlags.CommandBufferUsageSimultaneousUseBit;
 
-        var DrawCommandBuffer = SecondaryCommandBuffers[0];
+        var drawCommandBuffer = secondaryCommandBuffers[0];
 
-        BeginCommandBuffer(DrawCommandBuffer, usageFlags, &inherit);
+        BeginCommandBuffer(drawCommandBuffer, usageFlags, &inherit);
 
-        VkApi.CmdBindPipeline(DrawCommandBuffer, PipelineBindPoint.Graphics, GraphicsPipeline);
+        VkApi.CmdBindPipeline(drawCommandBuffer, PipelineBindPoint.Graphics, GraphicsPipeline);
 
-        VkApi.CmdSetViewport(DrawCommandBuffer, 0, 1, &viewport);
-        VkApi.CmdSetScissor(DrawCommandBuffer, 0, 1, &scissor);
+        VkApi.CmdSetViewport(drawCommandBuffer, 0, 1, &viewport);
+        VkApi.CmdSetScissor(drawCommandBuffer, 0, 1, &scissor);
 
         fixed (DescriptorSet* pDescriptorSets = DescriptorSets)
         {
             var setCount = (uint)DescriptorSets.Length;
 
-            VkApi.CmdBindDescriptorSets(DrawCommandBuffer, PipelineBindPoint.Graphics, GraphicsPipelineLayout, 0, setCount, pDescriptorSets, 0, null);
+            VkApi.CmdBindDescriptorSets(drawCommandBuffer, PipelineBindPoint.Graphics, GraphicsPipelineLayout, 0, setCount, pDescriptorSets, 0, null);
         }
 
         var vertexBuffer = VertexBuffer;
         ulong offset = 0;
 
-        VkApi.CmdBindVertexBuffers(DrawCommandBuffer, 0, 1, &vertexBuffer, &offset);
+        VkApi.CmdBindVertexBuffers(drawCommandBuffer, 0, 1, &vertexBuffer, &offset);
 
         vertexBuffer = InstanceBuffer;
 
-        VkApi.CmdBindVertexBuffers(DrawCommandBuffer, 1, 1, &vertexBuffer, &offset);
+        VkApi.CmdBindVertexBuffers(drawCommandBuffer, 1, 1, &vertexBuffer, &offset);
 
-        VkApi.CmdBindIndexBuffer(DrawCommandBuffer, IndexBuffer, 0, IndexType.Uint16);
+        VkApi.CmdBindIndexBuffer(drawCommandBuffer, IndexBuffer, 0, IndexType.Uint16);
 
-        VkApi.CmdDrawIndexed(DrawCommandBuffer, IndexCount, InstanceCount, 0, 0, 0);
-        EndCommandBuffer(DrawCommandBuffer);
+        VkApi.CmdDrawIndexed(drawCommandBuffer, IndexCount, InstanceCount, 0, 0, 0);
+        EndCommandBuffer(drawCommandBuffer);
     }
 
     private void InitializeFrameContexts()
@@ -202,7 +202,7 @@ public sealed unsafe class DrawCubeExample : GraphicsPipelineExample
 
         for (var i = 0; i < MaxFramesInFlight; ++i)
         {
-            ref var ctx = ref FrameContexts[i];
+            ref var ctx = ref frameContexts[i];
 
             ctx.CmdBuffer = buffers[i];
 
@@ -246,9 +246,9 @@ public sealed unsafe class DrawCubeExample : GraphicsPipelineExample
 
         VkApi.CmdBeginRenderPass(primary, &renderPassInfo, SubpassContents.SecondaryCommandBuffers);
 
-        fixed (CommandBuffer* cmds = SecondaryCommandBuffers)
+        fixed (CommandBuffer* cmds = secondaryCommandBuffers)
         {
-            VkApi.CmdExecuteCommands(primary, (uint)SecondaryCommandBuffers.Length, cmds);
+            VkApi.CmdExecuteCommands(primary, (uint)secondaryCommandBuffers.Length, cmds);
         }
 
         VkApi.CmdEndRenderPass(primary);

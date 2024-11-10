@@ -22,7 +22,7 @@ public enum AllocatorCreateFlags
     /// </summary>
     ExtMemoryBudget = 0x00000008,
 
-    AMDDeviceCoherentMemory = 0x00000010,
+    AmdDeviceCoherentMemory = 0x00000010,
 
     BufferDeviceAddress = 0x00000020,
 }

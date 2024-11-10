@@ -13,25 +13,25 @@ public class WaitScheduler : IDisposable
 {
     private static Vk VkApi => InstanceCreationExample.VkApi;
 
-    private readonly ConcurrentQueue<(Fence, TaskCompletionSource)> _fenceQueue = new();
+    private readonly ConcurrentQueue<(Fence, TaskCompletionSource)> fenceQueue = new();
 
-    private readonly Thread _schedulerThread;
+    private readonly Thread schedulerThread;
 
-    private readonly Device _device;
+    private readonly Device device;
 
-    private volatile int _state = 0;
+    private volatile int state = 0;
 
     public WaitScheduler(Device device)
     {
-        _device = device;
+        this.device = device;
 
-        _schedulerThread = new Thread(ScheduleThreadMethod);
-        _schedulerThread.Start();
+        schedulerThread = new Thread(ScheduleThreadMethod);
+        schedulerThread.Start();
     }
 
     public Task WaitForFenceAsync(Fence fence)
     {
-        var res = VkApi.GetFenceStatus(_device, fence);
+        var res = VkApi.GetFenceStatus(device, fence);
 
         switch (res)
         {
@@ -42,7 +42,7 @@ public class WaitScheduler : IDisposable
 
                 var tcs = new TaskCompletionSource();
 
-                _fenceQueue.Enqueue((fence, tcs));
+                fenceQueue.Enqueue((fence, tcs));
 
                 return tcs.Task;
             default:
@@ -52,7 +52,7 @@ public class WaitScheduler : IDisposable
 
     private void CheckState()
     {
-        var tmp = _state;
+        var tmp = state;
 
         if (tmp != 0)
         {
@@ -66,13 +66,13 @@ public class WaitScheduler : IDisposable
         var taskList = new List<TaskCompletionSource>(64);
         Result res;
 
-        while (_state == 0)
+        while (state == 0)
         {
-            while (_fenceQueue.TryDequeue(out var tuple))
+            while (fenceQueue.TryDequeue(out var tuple))
             {
                 var (fence, tcs) = tuple;
 
-                res = VkApi.GetFenceStatus(_device, fence);
+                res = VkApi.GetFenceStatus(device, fence);
 
                 switch (res)
                 {
@@ -99,7 +99,7 @@ public class WaitScheduler : IDisposable
                 continue;
             }
 
-            res = VkApi.WaitForFences(_device, (uint)list.Count, list.BasePointer, false, 5 * 1_000_000);
+            res = VkApi.WaitForFences(device, (uint)list.Count, list.BasePointer, false, 5 * 1_000_000);
 
             switch (res)
             {
@@ -112,7 +112,7 @@ public class WaitScheduler : IDisposable
                         var fence = list[i];
                         var source = taskList[i];
 
-                        res = VkApi.GetFenceStatus(_device, fence);
+                        res = VkApi.GetFenceStatus(device, fence);
 
                         if (res != Result.NotReady)
                         {
@@ -136,7 +136,7 @@ public class WaitScheduler : IDisposable
 
                     break;
                 default:
-                    _state = (int)res;
+                    state = (int)res;
 
                     var resMessage = "Unhandled Error: " + res;
 
@@ -152,41 +152,41 @@ public class WaitScheduler : IDisposable
 
     public void Dispose()
     {
-        _state = 1;
+        state = 1;
 
-        _schedulerThread.Join();
+        schedulerThread.Join();
     }
 
     private struct UnmanagedList<T> where T : unmanaged
     {
-        private T[] _array;
+        private T[] array;
 
         public UnmanagedList(int capacity)
         {
-            _array = GC.AllocateArray<T>(capacity, true);
+            array = GC.AllocateArray<T>(capacity, true);
             Count = 0;
         }
 
         public int Count { get; private set; }
 
-        public unsafe T* BasePointer => (T*)Unsafe.AsPointer(ref MemoryMarshal.GetArrayDataReference(_array));
+        public unsafe T* BasePointer => (T*)Unsafe.AsPointer(ref MemoryMarshal.GetArrayDataReference(array));
 
-        public T this[int idx] => _array[idx];
+        public T this[int idx] => array[idx];
 
         public void Add(T item)
         {
-            if (Count >= _array.Length)
+            if (Count >= array.Length)
             {
-                var newlen = _array.Length * 2;
+                var newlen = array.Length * 2;
 
                 var newArr = GC.AllocateArray<T>(newlen, true);
 
-                Array.Copy(_array, newArr, _array.Length);
+                Array.Copy(array, newArr, array.Length);
 
-                _array = newArr;
+                array = newArr;
             }
 
-            _array[Count++] = item;
+            array[Count++] = item;
         }
 
         public void RemoveAt(int idx)
@@ -198,7 +198,7 @@ public class WaitScheduler : IDisposable
 
             if (idx != Count - 1)
             {
-                Array.Copy(_array, idx + 1, _array, idx, Count - idx - 1);
+                Array.Copy(array, idx + 1, array, idx, Count - idx - 1);
             }
 
             Count -= 1;

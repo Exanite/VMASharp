@@ -8,12 +8,12 @@ namespace VMASharp;
 
 internal class VulkanMemoryBlock : IDisposable
 {
-    private Vk VkApi => _allocator.VkApi;
+    private Vk VkApi => allocator.VkApi;
 
-    private readonly VulkanMemoryAllocator _allocator;
+    private readonly VulkanMemoryAllocator allocator;
     internal readonly IBlockMetadata MetaData;
-    private readonly object _syncLock = new();
-    private int _mapCount;
+    private readonly object syncLock = new();
+    private int mapCount;
 
 
     public VulkanMemoryBlock(
@@ -24,7 +24,7 @@ internal class VulkanMemoryBlock : IDisposable
         uint id,
         IBlockMetadata metaObject)
     {
-        _allocator = allocator;
+        this.allocator = allocator;
         ParentPool = pool;
         MemoryTypeIndex = memoryTypeIndex;
         DeviceMemory = memory;
@@ -53,7 +53,7 @@ internal class VulkanMemoryBlock : IDisposable
 
         Debug.Assert(DeviceMemory.Handle != default);
 
-        _allocator.FreeVulkanMemory(MemoryTypeIndex, MetaData.Size, DeviceMemory);
+        allocator.FreeVulkanMemory(MemoryTypeIndex, MetaData.Size, DeviceMemory);
     }
 
     [Conditional("DEBUG")]
@@ -85,15 +85,15 @@ internal class VulkanMemoryBlock : IDisposable
             throw new ArgumentOutOfRangeException(nameof(count));
         }
 
-        lock (_syncLock)
+        lock (syncLock)
         {
-            Debug.Assert(_mapCount >= 0);
+            Debug.Assert(mapCount >= 0);
 
-            if (_mapCount > 0)
+            if (mapCount > 0)
             {
                 Debug.Assert(MappedData != default);
 
-                _mapCount += count;
+                mapCount += count;
 
                 return MappedData;
             }
@@ -104,7 +104,7 @@ internal class VulkanMemoryBlock : IDisposable
             }
 
             IntPtr pData;
-            var res = VkApi.MapMemory(_allocator.Device, DeviceMemory, 0, Vk.WholeSize, 0,
+            var res = VkApi.MapMemory(allocator.Device, DeviceMemory, 0, Vk.WholeSize, 0,
                 (void**)&pData);
 
             if (res != Result.Success)
@@ -112,7 +112,7 @@ internal class VulkanMemoryBlock : IDisposable
                 throw new MapMemoryException(res);
             }
 
-            _mapCount = count;
+            mapCount = count;
             MappedData = pData;
 
             return pData;
@@ -126,9 +126,9 @@ internal class VulkanMemoryBlock : IDisposable
             return;
         }
 
-        lock (_syncLock)
+        lock (syncLock)
         {
-            var newCount = _mapCount - count;
+            var newCount = mapCount - count;
 
             if (newCount < 0)
             {
@@ -136,12 +136,12 @@ internal class VulkanMemoryBlock : IDisposable
                     "Memory block is being unmapped while it was not previously mapped");
             }
 
-            _mapCount = newCount;
+            mapCount = newCount;
 
             if (newCount == 0)
             {
                 MappedData = default;
-                VkApi.UnmapMemory(_allocator.Device, DeviceMemory);
+                VkApi.UnmapMemory(allocator.Device, DeviceMemory);
             }
         }
     }
@@ -159,9 +159,9 @@ internal class VulkanMemoryBlock : IDisposable
 
         var memoryOffset = allocationLocalOffset + allocation.Offset;
 
-        lock (_syncLock)
+        lock (syncLock)
         {
-            return _allocator.BindVulkanBuffer(buffer, DeviceMemory, memoryOffset, pNext);
+            return allocator.BindVulkanBuffer(buffer, DeviceMemory, memoryOffset, pNext);
         }
     }
 
@@ -178,9 +178,9 @@ internal class VulkanMemoryBlock : IDisposable
 
         var memoryOffset = allocationLocalOffset + allocation.Offset;
 
-        lock (_syncLock)
+        lock (syncLock)
         {
-            return _allocator.BindVulkanImage(image, DeviceMemory, memoryOffset, pNext);
+            return allocator.BindVulkanImage(image, DeviceMemory, memoryOffset, pNext);
         }
     }
 }

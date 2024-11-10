@@ -180,7 +180,7 @@ public abstract class AllocatorAndBuffersExample : CommandPoolCreationExample
             usage: BufferUsageFlags.BufferUsageTransferSrcBit,
             size: (uint)Unsafe.SizeOf<T>() * (uint)span.Length);
 
-        AllocationCreateInfo allocInfo = new(AllocationCreateFlags.Mapped, usage: MemoryUsage.CPU_Only);
+        AllocationCreateInfo allocInfo = new(AllocationCreateFlags.Mapped, usage: MemoryUsage.CpuOnly);
 
         buffer = Allocator.CreateBuffer(in bufferInfo, in allocInfo, out alloc);
 
@@ -198,7 +198,7 @@ public abstract class AllocatorAndBuffersExample : CommandPoolCreationExample
             usage: usage | BufferUsageFlags.BufferUsageTransferDstBit,
             size: size);
 
-        AllocationCreateInfo allocInfo = new(usage: MemoryUsage.GPU_Only);
+        AllocationCreateInfo allocInfo = new(usage: MemoryUsage.GpuOnly);
 
         buffer = Allocator.CreateBuffer(in bufferInfo, in allocInfo, out alloc);
     }
@@ -217,7 +217,7 @@ public abstract class AllocatorAndBuffersExample : CommandPoolCreationExample
 
         // Allow this to be updated every frame
         var allocInfo = new AllocationCreateInfo(
-            usage: MemoryUsage.CPU_To_GPU,
+            usage: MemoryUsage.CpuToGpu,
             requiredFlags: MemoryPropertyFlags.MemoryPropertyHostVisibleBit);
 
         // Binds buffer to allocation for you
@@ -231,13 +231,13 @@ public abstract class AllocatorAndBuffersExample : CommandPoolCreationExample
 
         Camera.Perspective(radFov, aspect, 0.5f, 100f);
 
-        Camera.UpdateMVP();
+        Camera.UpdateMvp();
 
         allocation.Map();
 
         var ptr = (Matrix4x4*)allocation.MappedData;
 
-        ptr[0] = Camera.MVPMatrix; // Camera Matrix
+        ptr[0] = Camera.MvpMatrix; // Camera Matrix
         ptr[1] = Matrix4x4.Identity; // Model Matrix
 
         allocation.Unmap();
@@ -271,7 +271,7 @@ public abstract class AllocatorAndBuffersExample : CommandPoolCreationExample
             ViewType = ImageViewType.ImageViewType2D,
         };
 
-        var allocInfo = new AllocationCreateInfo(usage: MemoryUsage.GPU_Only);
+        var allocInfo = new AllocationCreateInfo(usage: MemoryUsage.GpuOnly);
 
         var image = Allocator.CreateImage(depthInfo, allocInfo, out var alloc);
 

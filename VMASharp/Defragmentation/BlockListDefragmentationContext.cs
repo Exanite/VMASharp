@@ -8,7 +8,7 @@ internal class BlockListDefragmentationContext
     public Result Result;
     public bool MutexLocked;
 
-    public readonly List<BlockDefragmentationContext> blockContexts = new();
+    public readonly List<BlockDefragmentationContext> BlockContexts = new();
     public readonly List<DefragmentationMove> DefragMoves = new();
 
     public int DefragMovesProcessed, DefragMovedCommitted;

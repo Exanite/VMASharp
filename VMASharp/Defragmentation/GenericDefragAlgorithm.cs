@@ -70,7 +70,7 @@ internal sealed class GenericDefragAlgorithm : DefragmentationAlgorithm
         }
     }
 
-    private readonly List<BlockInfo> Blocks = new();
+    private readonly List<BlockInfo> blocks = new();
 
     //private Result DefragmentRound()
 

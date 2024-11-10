@@ -6,8 +6,8 @@ namespace VMASharp;
 
 internal class DedicatedAllocation : Allocation
 {
-    private readonly DeviceMemory _memory;
-    private IntPtr _mappedData;
+    private readonly DeviceMemory memory;
+    private IntPtr mappedData;
 
     public DedicatedAllocation(
         VulkanMemoryAllocator allocator,
@@ -17,12 +17,12 @@ internal class DedicatedAllocation : Allocation
         IntPtr mappedData,
         long size) : base(allocator, 0)
     {
-        _memory = memory;
-        _mappedData = mappedData;
+        this.memory = memory;
+        this.mappedData = mappedData;
         MemoryTypeIndex = memTypeIndex;
     }
 
-    public override DeviceMemory DeviceMemory => _memory;
+    public override DeviceMemory DeviceMemory => memory;
 
     public override long Offset
     {
@@ -30,7 +30,7 @@ internal class DedicatedAllocation : Allocation
         internal set => throw new InvalidOperationException();
     }
 
-    public override IntPtr MappedData => MapCount != 0 ? _mappedData : default;
+    public override IntPtr MappedData => MapCount != 0 ? mappedData : default;
 
     internal override bool CanBecomeLost => false;
 
@@ -43,9 +43,9 @@ internal class DedicatedAllocation : Allocation
                 throw new InvalidOperationException("Dedicated allocation mapped too many times simultaneously");
             }
 
-            Debug.Assert(_mappedData != default);
+            Debug.Assert(mappedData != default);
 
-            pData = _mappedData;
+            pData = mappedData;
             MapCount += 1;
 
             return Result.Success;
@@ -54,11 +54,11 @@ internal class DedicatedAllocation : Allocation
         pData = default;
 
         IntPtr tmp;
-        var res = VkApi.MapMemory(Allocator.Device, _memory, 0, Vk.WholeSize, 0, (void**)&tmp);
+        var res = VkApi.MapMemory(Allocator.Device, memory, 0, Vk.WholeSize, 0, (void**)&tmp);
 
         if (res == Result.Success)
         {
-            _mappedData = tmp;
+            mappedData = tmp;
             MapCount = 1;
             pData = tmp;
         }
@@ -74,8 +74,8 @@ internal class DedicatedAllocation : Allocation
 
             if (MapCount == 0)
             {
-                _mappedData = default;
-                VkApi.UnmapMemory(Allocator.Device, _memory);
+                mappedData = default;
+                VkApi.UnmapMemory(Allocator.Device, memory);
             }
         }
         else

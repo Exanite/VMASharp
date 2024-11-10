@@ -13,7 +13,7 @@ using Buffer = Silk.NET.Vulkan.Buffer;
 
 namespace VMASharp;
 
-[PublicAPI]
+[PublicApi]
 public sealed unsafe class VulkanMemoryAllocator : IDisposable
 {
     private const long SmallHeapMaxSize = 1024L * 1024 * 1024;
@@ -32,25 +32,25 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
 
     internal readonly uint HeapSizeLimitMask;
 
-    private PhysicalDeviceProperties _physicalDeviceProperties;
-    private PhysicalDeviceMemoryProperties _memoryProperties;
+    private PhysicalDeviceProperties physicalDeviceProperties;
+    private PhysicalDeviceMemoryProperties memoryProperties;
 
     internal readonly BlockList[] BlockLists = new BlockList[Vk.MaxMemoryTypes]; //Default Pools
 
     internal readonly DedicatedAllocationHandler[] DedicatedAllocations =
         new DedicatedAllocationHandler[Vk.MaxMemoryTypes];
 
-    private readonly long _preferredLargeHeapBlockSize;
-    private readonly PhysicalDevice _physicalDevice;
-    private uint _gpuDefragmentationMemoryTypeBits = uint.MaxValue;
+    private readonly long preferredLargeHeapBlockSize;
+    private readonly PhysicalDevice physicalDevice;
+    private uint gpuDefragmentationMemoryTypeBits = uint.MaxValue;
 
-    private readonly ReaderWriterLockSlim _poolsMutex = new();
-    private readonly List<VulkanMemoryPool> _pools = new();
+    private readonly ReaderWriterLockSlim poolsMutex = new();
+    private readonly List<VulkanMemoryPool> pools = new();
     internal uint NextPoolId;
 
     internal readonly CurrentBudgetData Budget = new();
 
-    [PublicAPI]
+    [PublicApi]
     public VulkanMemoryAllocator(in VulkanMemoryAllocatorCreateInfo createInfo)
     {
         VkApi = createInfo.VulkanApiObject ?? throw new ArgumentNullException(nameof(createInfo.VulkanApiObject), "API vtable is null");
@@ -79,7 +79,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
         }
 
         Instance = createInfo.Instance;
-        _physicalDevice = createInfo.PhysicalDevice;
+        physicalDevice = createInfo.PhysicalDevice;
         Device = createInfo.LogicalDevice;
 
         VulkanApiVersion = createInfo.VulkanApiVersion;
@@ -90,18 +90,18 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
         }
 
         UseExtMemoryBudget = (createInfo.Flags & AllocatorCreateFlags.ExtMemoryBudget) != 0;
-        UseAmdDeviceCoherentMemory = (createInfo.Flags & AllocatorCreateFlags.AMDDeviceCoherentMemory) != 0;
+        UseAmdDeviceCoherentMemory = (createInfo.Flags & AllocatorCreateFlags.AmdDeviceCoherentMemory) != 0;
         UseKhrBufferDeviceAddress = (createInfo.Flags & AllocatorCreateFlags.BufferDeviceAddress) != 0;
 
-        VkApi.GetPhysicalDeviceProperties(_physicalDevice, out _physicalDeviceProperties);
-        VkApi.GetPhysicalDeviceMemoryProperties(_physicalDevice, out _memoryProperties);
+        VkApi.GetPhysicalDeviceProperties(physicalDevice, out physicalDeviceProperties);
+        VkApi.GetPhysicalDeviceMemoryProperties(physicalDevice, out memoryProperties);
 
         Debug.Assert(Helpers.IsPow2(Helpers.DebugAlignment));
         Debug.Assert(Helpers.IsPow2(Helpers.DebugMinBufferImageGranularity));
-        Debug.Assert(Helpers.IsPow2((long)_physicalDeviceProperties.Limits.BufferImageGranularity));
-        Debug.Assert(Helpers.IsPow2((long)_physicalDeviceProperties.Limits.NonCoherentAtomSize));
+        Debug.Assert(Helpers.IsPow2((long)physicalDeviceProperties.Limits.BufferImageGranularity));
+        Debug.Assert(Helpers.IsPow2((long)physicalDeviceProperties.Limits.NonCoherentAtomSize));
 
-        _preferredLargeHeapBlockSize = createInfo.PreferredLargeHeapBlockSize != 0
+        preferredLargeHeapBlockSize = createInfo.PreferredLargeHeapBlockSize != 0
             ? createInfo.PreferredLargeHeapBlockSize
             : 256L * 1024 * 1024;
 
@@ -110,7 +110,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
         if (createInfo.HeapSizeLimits != null)
         {
             Span<MemoryHeap> memoryHeaps =
-                MemoryMarshal.CreateSpan(ref _memoryProperties.MemoryHeaps.Element0, MemoryHeapCount);
+                MemoryMarshal.CreateSpan(ref memoryProperties.MemoryHeaps.Element0, MemoryHeapCount);
 
             var heapLimitLength = Math.Min(createInfo.HeapSizeLimits.Length, (int)Vk.MaxMemoryHeaps);
 
@@ -156,21 +156,21 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
 
     public int CurrentFrameIndex { get; set; }
 
-    internal long BufferImageGranularity => (long)Math.Max(1, _physicalDeviceProperties.Limits.BufferImageGranularity);
+    internal long BufferImageGranularity => (long)Math.Max(1, physicalDeviceProperties.Limits.BufferImageGranularity);
 
     internal int MemoryHeapCount => (int)MemoryProperties.MemoryHeapCount;
 
     internal int MemoryTypeCount => (int)MemoryProperties.MemoryTypeCount;
 
-    internal bool IsIntegratedGpu => _physicalDeviceProperties.DeviceType == PhysicalDeviceType.IntegratedGpu;
+    internal bool IsIntegratedGpu => physicalDeviceProperties.DeviceType == PhysicalDeviceType.IntegratedGpu;
 
     internal uint GlobalMemoryTypeBits { get; }
 
 
-    [PublicAPI]
+    [PublicApi]
     public void Dispose()
     {
-        if (_pools.Count != 0)
+        if (pools.Count != 0)
         {
             throw new InvalidOperationException("");
         }
@@ -188,13 +188,13 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
         }
     }
 
-    [PublicAPI]
+    [PublicApi]
     public MemoryPropertyFlags GetMemoryTypeProperties(int memoryTypeIndex)
     {
-        return _memoryProperties.MemoryTypes[memoryTypeIndex].PropertyFlags;
+        return memoryProperties.MemoryTypes[memoryTypeIndex].PropertyFlags;
     }
 
-    [PublicAPI]
+    [PublicApi]
     public int? FindMemoryTypeIndex(uint memoryTypeBits, in AllocationCreateInfo allocInfo)
     {
         memoryTypeBits &= GlobalMemoryTypeBits;
@@ -212,7 +212,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
         {
             case MemoryUsage.Unknown:
                 break;
-            case MemoryUsage.GPU_Only:
+            case MemoryUsage.GpuOnly:
                 if (IsIntegratedGpu ||
                     (preferredFlags & MemoryPropertyFlags.HostVisibleBit) == 0)
                 {
@@ -220,12 +220,12 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
                 }
 
                 break;
-            case MemoryUsage.CPU_Only:
+            case MemoryUsage.CpuOnly:
                 requiredFlags |= MemoryPropertyFlags.HostVisibleBit |
                     MemoryPropertyFlags.HostCoherentBit;
 
                 break;
-            case MemoryUsage.CPU_To_GPU:
+            case MemoryUsage.CpuToGpu:
                 requiredFlags |= MemoryPropertyFlags.HostVisibleBit;
                 if (!IsIntegratedGpu ||
                     (preferredFlags & MemoryPropertyFlags.HostVisibleBit) == 0)
@@ -234,16 +234,16 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
                 }
 
                 break;
-            case MemoryUsage.GPU_To_CPU:
+            case MemoryUsage.GpuToCpu:
                 requiredFlags |= MemoryPropertyFlags.HostVisibleBit;
                 preferredFlags |= MemoryPropertyFlags.HostCachedBit;
 
                 break;
-            case MemoryUsage.CPU_Copy:
+            case MemoryUsage.CpuCopy:
                 notPreferredFlags |= MemoryPropertyFlags.DeviceLocalBit;
 
                 break;
-            case MemoryUsage.GPU_LazilyAllocated:
+            case MemoryUsage.GpuLazilyAllocated:
                 requiredFlags |= MemoryPropertyFlags.LazilyAllocatedBit;
 
                 break;
@@ -269,7 +269,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
                 continue;
             }
 
-            MemoryPropertyFlags currFlags = _memoryProperties.MemoryTypes[memTypeIndex].PropertyFlags;
+            MemoryPropertyFlags currFlags = memoryProperties.MemoryTypes[memTypeIndex].PropertyFlags;
 
             if ((requiredFlags & ~currFlags) != 0)
             {
@@ -295,7 +295,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
         return memoryTypeIndex;
     }
 
-    [PublicAPI]
+    [PublicApi]
     public int? FindMemoryTypeIndexForBufferInfo(
         in BufferCreateInfo bufferInfo,
         in AllocationCreateInfo allocInfo)
@@ -321,7 +321,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
         return tmp;
     }
 
-    [PublicAPI]
+    [PublicApi]
     public int? FindMemoryTypeIndexForImageInfo(in ImageCreateInfo imageInfo, in AllocationCreateInfo allocInfo)
     {
         Image image;
@@ -351,7 +351,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
     /// <param name="requirements">Memory Requirements for the allocation</param>
     /// <param name="createInfo">Allocation Creation information</param>
     /// <returns>An object representing the allocation</returns>
-    [PublicAPI]
+    [PublicApi]
     public Allocation AllocateMemory(in MemoryRequirements requirements, in AllocationCreateInfo createInfo)
     {
         var dedicatedInfo = DedicatedAllocationInfo.Default;
@@ -367,7 +367,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
     /// <param name="createInfo"></param>
     /// <param name="bindToBuffer">Whether to bind <paramref name="buffer"/> to the allocation</param>
     /// <returns></returns>
-    [PublicAPI]
+    [PublicApi]
     public Allocation AllocateMemoryForBuffer(
         Buffer buffer,
         in AllocationCreateInfo createInfo,
@@ -398,7 +398,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
     /// <param name="createInfo"></param>
     /// <param name="bindToImage">Whether to bind <paramref name="image"/> to the allocation</param>
     /// <returns></returns>
-    [PublicAPI]
+    [PublicApi]
     public Allocation AllocateMemoryForImage(
         Image image,
         in AllocationCreateInfo createInfo,
@@ -422,13 +422,13 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
         return alloc;
     }
 
-    [PublicAPI]
+    [PublicApi]
     public Result CheckCorruption(uint memoryTypeBits)
     {
         throw new NotImplementedException();
     }
 
-    [PublicAPI]
+    [PublicApi]
     public Buffer CreateBuffer(
         in BufferCreateInfo bufferInfo,
         in AllocationCreateInfo allocInfo,
@@ -496,7 +496,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
     /// <param name="allocInfo">Information to allocate memory for the image</param>
     /// <param name="allocation">The object corresponding to the allocation</param>
     /// <returns>The created image</returns>
-    [PublicAPI]
+    [PublicApi]
     public Image CreateImage(
         in ImageCreateInfo imageInfo,
         in AllocationCreateInfo allocInfo,
@@ -560,18 +560,18 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
         return image;
     }
 
-    public ref readonly PhysicalDeviceMemoryProperties MemoryProperties => ref _memoryProperties;
+    public ref readonly PhysicalDeviceMemoryProperties MemoryProperties => ref memoryProperties;
 
     internal int MemoryTypeIndexToHeapIndex(int typeIndex)
     {
         Debug.Assert(typeIndex < MemoryProperties.MemoryTypeCount);
 
-        return (int)_memoryProperties.MemoryTypes[typeIndex].HeapIndex;
+        return (int)memoryProperties.MemoryTypes[typeIndex].HeapIndex;
     }
 
     internal bool IsMemoryTypeNonCoherent(int memTypeIndex)
     {
-        return (_memoryProperties.MemoryTypes[memTypeIndex].PropertyFlags & (MemoryPropertyFlags.HostVisibleBit |
+        return (memoryProperties.MemoryTypes[memTypeIndex].PropertyFlags & (MemoryPropertyFlags.HostVisibleBit |
                 MemoryPropertyFlags.HostCoherentBit)) ==
             MemoryPropertyFlags.HostVisibleBit;
     }
@@ -579,7 +579,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
     internal long GetMemoryTypeMinAlignment(int memTypeIndex)
     {
         return IsMemoryTypeNonCoherent(memTypeIndex)
-            ? (long)Math.Max(1, _physicalDeviceProperties.Limits.NonCoherentAtomSize)
+            ? (long)Math.Max(1, physicalDeviceProperties.Limits.NonCoherentAtomSize)
             : 1;
     }
 
@@ -702,7 +702,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
             var infoForPool = createInfo;
 
             if ((createInfo.Flags & AllocationCreateFlags.Mapped) != 0 &&
-                (_memoryProperties.MemoryTypes[memoryTypeIndex].PropertyFlags &
+                (memoryProperties.MemoryTypes[memoryTypeIndex].PropertyFlags &
                     MemoryPropertyFlags.HostVisibleBit) == 0)
             {
                 infoForPool.Flags &= ~AllocationCreateFlags.Mapped;
@@ -780,17 +780,17 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
             list.AddStats(newStats);
         }
 
-        _poolsMutex.EnterReadLock();
+        poolsMutex.EnterReadLock();
         try
         {
-            foreach (var pool in _pools)
+            foreach (var pool in pools)
             {
                 pool.BlockList.AddStats(newStats);
             }
         }
         finally
         {
-            _poolsMutex.ExitReadLock();
+            poolsMutex.ExitReadLock();
         }
 
         for (var typeIndex = 0; typeIndex < MemoryTypeCount; ++typeIndex)
@@ -858,7 +858,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
                     outBudget.Usage = 0;
                 }
 
-                outBudget.Budget = Math.Min(heapBudget.VulkanBudget, (long)_memoryProperties.MemoryHeaps[heapIndex].Size);
+                outBudget.Budget = Math.Min(heapBudget.VulkanBudget, (long)memoryProperties.MemoryHeaps[heapIndex].Size);
             }
             finally
             {
@@ -873,7 +873,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
             outBudget.AllocationBytes = heapBudget.AllocationBytes;
 
             outBudget.Usage = heapBudget.BlockBytes;
-            outBudget.Budget = (long)(_memoryProperties.MemoryHeaps[heapIndex].Size * 8 / 10); // 80% heuristics
+            outBudget.Budget = (long)(memoryProperties.MemoryHeaps[heapIndex].Size * 8 / 10); // 80% heuristics
         }
     }
 
@@ -918,7 +918,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
                         outBudget.Usage = 0;
                     }
 
-                    outBudget.Budget = Math.Min(heapBudget.VulkanBudget, (long)_memoryProperties.MemoryHeaps[heapIndex].Size);
+                    outBudget.Budget = Math.Min(heapBudget.VulkanBudget, (long)memoryProperties.MemoryHeaps[heapIndex].Size);
                 }
             }
             finally
@@ -938,7 +938,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
                 outBudget.AllocationBytes = heapBudget.AllocationBytes;
 
                 outBudget.Usage = heapBudget.BlockBytes;
-                outBudget.Budget = (long)(_memoryProperties.MemoryHeaps[heapIndex].Size * 8 / 10); //80% heuristics
+                outBudget.Budget = (long)(memoryProperties.MemoryHeaps[heapIndex].Size * 8 / 10); //80% heuristics
             }
         }
     }
@@ -992,14 +992,14 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
 
         VulkanMemoryPool pool = new(this, tmpCreateInfo, preferredBlockSize);
 
-        _poolsMutex.EnterWriteLock();
+        poolsMutex.EnterWriteLock();
         try
         {
-            _pools.Add(pool);
+            pools.Add(pool);
         }
         finally
         {
-            _poolsMutex.ExitWriteLock();
+            poolsMutex.ExitWriteLock();
         }
 
         return pool;
@@ -1007,15 +1007,15 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
 
     internal void DestroyPool(VulkanMemoryPool pool)
     {
-        _poolsMutex.EnterWriteLock();
+        poolsMutex.EnterWriteLock();
         try
         {
-            var success = _pools.Remove(pool);
+            var success = pools.Remove(pool);
             Debug.Assert(success, "Pool not found in allocator");
         }
         finally
         {
-            _poolsMutex.ExitWriteLock();
+            poolsMutex.ExitWriteLock();
         }
     }
 
@@ -1048,7 +1048,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
         {
             long heapSize, blockBytes, blockBytesAfterAlloc;
 
-            heapSize = (long)_memoryProperties.MemoryHeaps[heapIndex].Size;
+            heapSize = (long)memoryProperties.MemoryHeaps[heapIndex].Size;
 
             do
             {
@@ -1130,7 +1130,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
     internal void FillAllocation(Allocation allocation, byte pattern)
     {
         if (!Helpers.DebugInitializeAllocations || allocation.CanBecomeLost ||
-            (_memoryProperties.MemoryTypes[allocation.MemoryTypeIndex].PropertyFlags &
+            (memoryProperties.MemoryTypes[allocation.MemoryTypeIndex].PropertyFlags &
                 MemoryPropertyFlags.HostVisibleBit) == 0)
         {
             return;
@@ -1148,14 +1148,14 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
 
     internal uint GetGpuDefragmentationMemoryTypeBits()
     {
-        var memTypeBits = _gpuDefragmentationMemoryTypeBits;
+        var memTypeBits = gpuDefragmentationMemoryTypeBits;
         if (memTypeBits != uint.MaxValue)
         {
             return memTypeBits;
         }
 
         memTypeBits = CalculateGpuDefragmentationMemoryTypeBits();
-        _gpuDefragmentationMemoryTypeBits = memTypeBits;
+        gpuDefragmentationMemoryTypeBits = memTypeBits;
 
         return memTypeBits;
     }
@@ -1166,9 +1166,9 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
 
         Debug.Assert((uint)heapIndex < Vk.MaxMemoryHeaps);
 
-        var heapSize = (long)_memoryProperties.MemoryHeaps[heapIndex].Size;
+        var heapSize = (long)memoryProperties.MemoryHeaps[heapIndex].Size;
 
-        return Helpers.AlignUp(heapSize <= SmallHeapMaxSize ? heapSize / 8 : _preferredLargeHeapBlockSize,
+        return Helpers.AlignUp(heapSize <= SmallHeapMaxSize ? heapSize / 8 : preferredLargeHeapBlockSize,
             32);
     }
 
@@ -1183,12 +1183,12 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
         var finalCreateInfo = createInfo;
 
         if ((finalCreateInfo.Flags & AllocationCreateFlags.Mapped) != 0 &&
-            (_memoryProperties.MemoryTypes[memoryTypeIndex].PropertyFlags & MemoryPropertyFlags.HostVisibleBit) == 0)
+            (memoryProperties.MemoryTypes[memoryTypeIndex].PropertyFlags & MemoryPropertyFlags.HostVisibleBit) == 0)
         {
             finalCreateInfo.Flags &= ~AllocationCreateFlags.Mapped;
         }
 
-        if (finalCreateInfo.Usage == MemoryUsage.GPU_LazilyAllocated)
+        if (finalCreateInfo.Usage == MemoryUsage.GpuLazilyAllocated)
         {
             finalCreateInfo.Flags |= AllocationCreateFlags.DedicatedMemory;
         }
@@ -1394,12 +1394,12 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
 
         var memoryTypeBits = uint.MaxValue;
 
-        if (_physicalDeviceProperties.VendorID == AmdVendorId && !UseAmdDeviceCoherentMemory)
+        if (physicalDeviceProperties.VendorID == AmdVendorId && !UseAmdDeviceCoherentMemory)
         {
             // Exclude memory types that have VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD.
             for (var index = 0; index < MemoryTypeCount; ++index)
             {
-                if ((_memoryProperties.MemoryTypes[index].PropertyFlags &
+                if ((memoryProperties.MemoryTypes[index].PropertyFlags &
                     MemoryPropertyFlags.DeviceCoherentBitAmd) != 0)
                 {
                     memoryTypeBits &= ~(1u << index);
@@ -1419,7 +1419,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
 
         PhysicalDeviceMemoryProperties2 memProps = new(StructureType.PhysicalDeviceMemoryProperties2, &budgetProps);
 
-        VkApi.GetPhysicalDeviceMemoryProperties2(_physicalDevice, &memProps);
+        VkApi.GetPhysicalDeviceMemoryProperties2(physicalDevice, &memProps);
 
         Budget.BudgetMutex.EnterWriteLock();
         try
@@ -1435,7 +1435,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
 
                 // Some bugged drivers return the budget incorrectly, e.g. 0 or much bigger than heap size.
 
-                ref MemoryHeap heap = ref _memoryProperties.MemoryHeaps[i];
+                ref MemoryHeap heap = ref memoryProperties.MemoryHeaps[i];
 
                 if (data.VulkanBudget == 0)
                 {
@@ -1469,7 +1469,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
 
             Debug.Assert((ulong)offset <= (ulong)allocSize);
 
-            var nonCoherentAtomSize = (long)_physicalDeviceProperties.Limits.NonCoherentAtomSize;
+            var nonCoherentAtomSize = (long)physicalDeviceProperties.Limits.NonCoherentAtomSize;
 
             MappedMemoryRange memRange = new(memory: allocation.DeviceMemory);
 

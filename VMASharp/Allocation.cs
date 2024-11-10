@@ -18,10 +18,10 @@ public abstract unsafe class Allocation : IDisposable
 
     protected Vk VkApi => Allocator.VkApi;
 
-    private long _size;
+    private long size;
     protected int MapCount;
-    private bool _lostOrDisposed;
-    private int _lastUseFrameIndex;
+    private bool lostOrDisposed;
+    private int lastUseFrameIndex;
 
     /// <summary>
     /// Size of this allocation, in bytes.
@@ -31,14 +31,14 @@ public abstract unsafe class Allocation : IDisposable
     {
         get
         {
-            if (_lostOrDisposed || _lastUseFrameIndex == Helpers.FrameIndexLost)
+            if (lostOrDisposed || lastUseFrameIndex == Helpers.FrameIndexLost)
             {
                 return 0;
             }
 
-            return _size;
+            return size;
         }
-        protected set => _size = value;
+        protected set => size = value;
     }
 
     /// <summary>
@@ -66,7 +66,7 @@ public abstract unsafe class Allocation : IDisposable
 
     internal bool IsPersistantMapped => MapCount < 0;
 
-    internal int LastUseFrameIndex => _lastUseFrameIndex;
+    internal int LastUseFrameIndex => lastUseFrameIndex;
 
     protected internal long Alignment { get; protected set; }
 
@@ -75,8 +75,8 @@ public abstract unsafe class Allocation : IDisposable
     internal Allocation(VulkanMemoryAllocator allocator, int currentFrameIndex)
     {
         Allocator = allocator;
-        _lastUseFrameIndex = LastUseFrameIndex;
-        _lastUseFrameIndex = currentFrameIndex;
+        lastUseFrameIndex = LastUseFrameIndex;
+        lastUseFrameIndex = currentFrameIndex;
     }
 
     /// <summary>
@@ -87,10 +87,10 @@ public abstract unsafe class Allocation : IDisposable
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        if (!_lostOrDisposed)
+        if (!lostOrDisposed)
         {
             Allocator.FreeMemory(this);
-            _lostOrDisposed = true;
+            lostOrDisposed = true;
         }
     }
 
@@ -145,7 +145,7 @@ public abstract unsafe class Allocation : IDisposable
                 "Internal Exception, tried to make an allocation lost that cannot become lost.");
         }
 
-        var localLastUseFrameIndex = _lastUseFrameIndex;
+        var localLastUseFrameIndex = lastUseFrameIndex;
 
         while (true)
         {
@@ -161,12 +161,12 @@ public abstract unsafe class Allocation : IDisposable
                 return false;
             }
 
-            int tmp = Interlocked.CompareExchange(ref _lastUseFrameIndex, Helpers.FrameIndexLost,
+            int tmp = Interlocked.CompareExchange(ref lastUseFrameIndex, Helpers.FrameIndexLost,
                 localLastUseFrameIndex);
 
             if (tmp == localLastUseFrameIndex)
             {
-                _lostOrDisposed = true;
+                lostOrDisposed = true;
 
                 return true;
             }
@@ -177,13 +177,13 @@ public abstract unsafe class Allocation : IDisposable
 
     public bool TouchAllocation()
     {
-        if (_lostOrDisposed)
+        if (lostOrDisposed)
         {
             return false;
         }
 
         var currFrameIndexLoc = Allocator.CurrentFrameIndex;
-        var lastUseFrameIndexLoc = _lastUseFrameIndex;
+        var lastUseFrameIndexLoc = lastUseFrameIndex;
 
         if (CanBecomeLost)
         {
@@ -199,7 +199,7 @@ public abstract unsafe class Allocation : IDisposable
                     return true;
                 }
 
-                lastUseFrameIndexLoc = Interlocked.CompareExchange(ref _lastUseFrameIndex, currFrameIndexLoc,
+                lastUseFrameIndexLoc = Interlocked.CompareExchange(ref lastUseFrameIndex, currFrameIndexLoc,
                     lastUseFrameIndexLoc);
             }
         }
@@ -213,7 +213,7 @@ public abstract unsafe class Allocation : IDisposable
                 break;
             }
 
-            lastUseFrameIndexLoc = Interlocked.CompareExchange(ref _lastUseFrameIndex, currFrameIndexLoc,
+            lastUseFrameIndexLoc = Interlocked.CompareExchange(ref lastUseFrameIndex, currFrameIndexLoc,
                 lastUseFrameIndexLoc);
         }
 
@@ -289,25 +289,25 @@ public abstract unsafe class Allocation : IDisposable
     private sealed class UnmanagedMemoryManager<T> : MemoryManager<T>
         where T : unmanaged
     {
-        private readonly T* _pointer;
-        private readonly int _elementCount;
+        private readonly T* pointer;
+        private readonly int elementCount;
 
         public UnmanagedMemoryManager(void* ptr, int elemCount)
         {
-            _pointer = (T*)ptr;
-            _elementCount = elemCount;
+            pointer = (T*)ptr;
+            elementCount = elemCount;
         }
 
         protected override void Dispose(bool disposing) {}
 
         public override Span<T> GetSpan()
         {
-            return new(_pointer, _elementCount);
+            return new(pointer, elementCount);
         }
 
         public override MemoryHandle Pin(int elementIndex = 0)
         {
-            return new MemoryHandle(_pointer + elementIndex);
+            return new MemoryHandle(pointer + elementIndex);
         }
 
         public override void Unpin() {}

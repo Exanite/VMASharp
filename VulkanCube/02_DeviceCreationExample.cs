@@ -74,7 +74,7 @@ public abstract unsafe class DeviceCreationExample : InstanceCreationExample
         throw new Exception("No suitable device found!");
     }
 
-    private Device CreateLogicalDevice(out Queue GraphicsQueue, out Queue PresentQueue)
+    private Device CreateLogicalDevice(out Queue graphicsQueue, out Queue presentQueue)
     {
         var queueInfos = stackalloc DeviceQueueCreateInfo[2];
         uint infoCount = 1;
@@ -121,7 +121,7 @@ public abstract unsafe class DeviceCreationExample : InstanceCreationExample
         Queue queue = default;
         VkApi.GetDeviceQueue(device, (uint)QueueIndices.GraphicsFamily, 0, &queue);
 
-        GraphicsQueue = queue;
+        graphicsQueue = queue;
 
         if (QueueIndices.GraphicsFamily != QueueIndices.PresentFamily)
         {
@@ -129,7 +129,7 @@ public abstract unsafe class DeviceCreationExample : InstanceCreationExample
             VkApi.GetDeviceQueue(device, (uint)QueueIndices.PresentFamily, 0, &queue);
         }
 
-        PresentQueue = queue;
+        presentQueue = queue;
 
         return device;
     }
@@ -151,9 +151,9 @@ public abstract unsafe class DeviceCreationExample : InstanceCreationExample
         {
             ref var queueFamily = ref families[i];
 
-            const QueueFlags GraphicsQueueBits = QueueFlags.QueueGraphicsBit | QueueFlags.QueueTransferBit;
+            const QueueFlags graphicsQueueBits = QueueFlags.QueueGraphicsBit | QueueFlags.QueueTransferBit;
 
-            if ((queueFamily.QueueFlags & GraphicsQueueBits) == GraphicsQueueBits)
+            if ((queueFamily.QueueFlags & graphicsQueueBits) == graphicsQueueBits)
             {
                 indices.GraphicsFamily = (uint)i;
             }
