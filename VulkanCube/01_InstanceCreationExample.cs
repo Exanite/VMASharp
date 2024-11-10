@@ -1,123 +1,121 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices;
-
-using Silk.NET.Windowing;
 using Silk.NET.Core;
+using Silk.NET.Core.Native;
 using Silk.NET.Vulkan;
 using Silk.NET.Vulkan.Extensions.KHR;
-using Silk.NET.Vulkan.Extensions.EXT;
-using Silk.NET.Core.Native;
+using Silk.NET.Windowing;
+using VMASharp;
 
-namespace VulkanCube
+namespace VulkanCube;
+
+public abstract unsafe class InstanceCreationExample : ExampleBase
 {
-    public unsafe abstract class InstanceCreationExample : ExampleBase
+    internal static readonly Vk VkApi;
+
+    static InstanceCreationExample()
     {
-        internal static readonly Vk VkApi;
+        VkApi = Vk.GetApi();
+    }
 
-        static InstanceCreationExample()
+    protected readonly IWindow DisplayWindow;
+    protected readonly Instance Instance;
+    protected readonly KhrSurface VkSurface;
+
+    protected readonly SurfaceKHR WindowSurface;
+
+    protected InstanceCreationExample()
+    {
+        DisplayWindow = CreateWindow();
+        Instance = CreateInstance();
+
+        if (!VkApi.TryGetInstanceExtension(Instance, out VkSurface))
         {
-            VkApi = Vk.GetApi();
+            throw new Exception("VK_KHR_Surface is missing or not specified");
         }
 
-        protected readonly IWindow DisplayWindow;
-        protected readonly Instance Instance;
-        protected readonly KhrSurface VkSurface;
+        WindowSurface = DisplayWindow.VkSurface.Create<AllocationCallbacks>(Instance.ToHandle(), null).ToSurface();
+    }
 
-        protected readonly SurfaceKHR WindowSurface;
+    private static IWindow CreateWindow()
+    {
+        var options = WindowOptions.DefaultVulkan;
 
-        protected InstanceCreationExample()
+        options.Title = "Hello Cube";
+        options.FramesPerSecond = 60;
+
+        Window.PrioritizeGlfw();
+
+        var window = Window.Create(options);
+
+        window.Initialize();
+
+        if (window.VkSurface == null)
         {
-            this.DisplayWindow = CreateWindow();
-            this.Instance = CreateInstance();
-
-            if (!VkApi.TryGetInstanceExtension(this.Instance, out VkSurface))
-            {
-                throw new Exception("VK_KHR_Surface is missing or not specified");
-            }
-
-            this.WindowSurface = this.DisplayWindow.VkSurface.Create<AllocationCallbacks>(this.Instance.ToHandle(), null).ToSurface();
+            throw new NotSupportedException("Vulkan is not supported.");
         }
 
-        private static IWindow CreateWindow()
+        return window;
+    }
+
+    private Instance CreateInstance()
+    {
+        using var appName = SilkMarshal.StringToMemory("Hello Cube");
+        using var engineName = SilkMarshal.StringToMemory("Custom Engine");
+
+        var appInfo = new ApplicationInfo
+        (
+            pApplicationName: (byte*)appName,
+            applicationVersion: new Version32(0, 0, 1),
+            pEngineName: (byte*)engineName,
+            engineVersion: new Version32(0, 0, 1),
+            apiVersion: Vk.Version11
+        );
+
+        var extensions = new List<string>(GetWindowExtensions())
         {
-            var options = WindowOptions.DefaultVulkan;
+            Debugging.DebugExtensionString,
+        };
 
-            options.Title = "Hello Cube";
-            options.FramesPerSecond = 60;
+        string[] layers = { "VK_LAYER_KHRONOS_validation" };
 
-            Window.PrioritizeGlfw();
+        using var extList = SilkMarshal.StringArrayToMemory(extensions);
+        using var layerList = SilkMarshal.StringArrayToMemory(layers);
 
-            var window = Window.Create(options);
+        var instInfo = new InstanceCreateInfo(pApplicationInfo: &appInfo,
+            enabledLayerCount: (uint)layers.Length,
+            ppEnabledLayerNames: (byte**)layerList,
+            enabledExtensionCount: (uint)extensions.Count,
+            ppEnabledExtensionNames: (byte**)extList);
 
-            window.Initialize();
+        Instance inst;
+        var res = VkApi.CreateInstance(&instInfo, null, &inst);
 
-            if (window.VkSurface == null)
-                throw new NotSupportedException("Vulkan is not supported.");
-
-            return window;
+        if (res != Result.Success)
+        {
+            throw new VulkanResultException("Instance Creation Failed", res);
         }
 
-        private Instance CreateInstance()
-        {
-            using var appName = SilkMarshal.StringToMemory("Hello Cube");
-            using var engineName = SilkMarshal.StringToMemory("Custom Engine");
+        return inst;
+    }
 
-            var appInfo = new ApplicationInfo
-            (
-                pApplicationName: (byte*)appName,
-                applicationVersion: new Version32(0, 0, 1),
-                pEngineName: (byte*)engineName,
-                engineVersion: new Version32(0, 0, 1),
-                apiVersion: Vk.Version11
-            );
+    public override void Dispose()
+    {
+        VkSurface.DestroySurface(Instance, WindowSurface, null);
 
-            List<string> extensions = new List<string>(GetWindowExtensions())
-            {
-                Debugging.DebugExtensionString
-            };
+        VkApi.DestroyInstance(Instance, null);
 
-            string[] layers = new string[] { "VK_LAYER_KHRONOS_validation" };
+        DisplayWindow.Reset();
+    }
 
-            using var extList = SilkMarshal.StringArrayToMemory(extensions);
-            using var layerList = SilkMarshal.StringArrayToMemory(layers);
+    private string[] GetWindowExtensions()
+    {
+        var ptr = (IntPtr)DisplayWindow.VkSurface.GetRequiredExtensions(out var count);
 
-            var instInfo = new InstanceCreateInfo(pApplicationInfo: &appInfo,
-                                                enabledLayerCount: (uint)layers.Length,
-                                                ppEnabledLayerNames: (byte**)layerList,
-                                                enabledExtensionCount: (uint)extensions.Count,
-                                                ppEnabledExtensionNames: (byte**)extList);
+        var arr = new string[count];
 
-            Instance inst;
-            var res = VkApi.CreateInstance(&instInfo, null, &inst);
+        SilkMarshal.CopyPtrToStringArray(ptr, arr);
 
-            if (res != Result.Success)
-            {
-                throw new VMASharp.VulkanResultException("Instance Creation Failed", res);
-            }
-
-            return inst;
-        }
-
-        public override void Dispose()
-        {
-            this.VkSurface.DestroySurface(this.Instance, this.WindowSurface, null);
-            
-            VkApi.DestroyInstance(this.Instance, null);
-            
-            this.DisplayWindow.Reset();
-        }
-
-        private string[] GetWindowExtensions()
-        {
-            var ptr = (IntPtr)this.DisplayWindow.VkSurface.GetRequiredExtensions(out uint count);
-
-            string[] arr = new string[count];
-
-            SilkMarshal.CopyPtrToStringArray(ptr, arr);
-
-            return arr;
-        }
+        return arr;
     }
 }

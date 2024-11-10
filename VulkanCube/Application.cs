@@ -1,29 +1,28 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
+using VMASharp;
 
-namespace VulkanCube
+namespace VulkanCube;
+
+public class Application
 {
-    public class Application
+    private static void Main(string[] args)
     {
-        private static void Main(string[] args)
+        try
         {
-            try
-            {
-                var app = new DrawCubeExample();
+            var app = new DrawCubeExample();
 
-                app.Run();
+            app.Run();
 
-                app.Dispose();
-            }
-            catch (Exception e)
+            app.Dispose();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+
+            if (e is VulkanResultException ve)
             {
-                Console.WriteLine(e);
-                
-                if (e is VMASharp.VulkanResultException ve)
-                    Console.WriteLine("\nResult Code: " + ve.Result);
+                Console.WriteLine("\nResult Code: " + ve.Result);
             }
         }
-
     }
 }

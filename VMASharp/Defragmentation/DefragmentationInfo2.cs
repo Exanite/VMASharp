@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Silk.NET.Vulkan;
-using VMASharp;
+﻿using Silk.NET.Vulkan;
 
 namespace VMASharp.Defragmentation;
 

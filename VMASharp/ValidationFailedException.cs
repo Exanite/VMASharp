@@ -1,4 +1,6 @@
-﻿namespace VMASharp;
+﻿using System;
+
+arp;
 
 public class ValidationFailedException : ApplicationException
 {

@@ -6,34 +6,45 @@ public class Stats
 {
     public readonly StatInfo[] MemoryType;
     public readonly StatInfo[] MemoryHeap;
-    public          StatInfo   Total;
+    public StatInfo Total;
 
-    internal Stats(StatInfo[] memoryTypes, StatInfo[] memoryHeaps, in StatInfo total) {
+    internal Stats(StatInfo[] memoryTypes, StatInfo[] memoryHeaps, in StatInfo total)
+    {
         MemoryType = memoryTypes;
         MemoryHeap = memoryHeaps;
         Total = total;
     }
 
-    internal Stats() {
+    internal Stats()
+    {
         StatInfo.Init(out Total);
 
         MemoryType = new StatInfo[Vk.MaxMemoryTypes];
         MemoryHeap = new StatInfo[Vk.MaxMemoryHeaps];
 
-        for (int i = 0; i < Vk.MaxMemoryTypes; ++i)
+        for (var i = 0; i < Vk.MaxMemoryTypes; ++i)
+        {
             StatInfo.Init(out MemoryType[i]);
+        }
 
-        for (int i = 0; i < Vk.MaxMemoryHeaps; ++i)
+        for (var i = 0; i < Vk.MaxMemoryHeaps; ++i)
+        {
             StatInfo.Init(out MemoryHeap[i]);
+        }
     }
 
-    internal void PostProcess() {
+    internal void PostProcess()
+    {
         StatInfo.PostProcessCalcStatInfo(ref Total);
 
-        for (int i = 0; i < Vk.MaxMemoryTypes; ++i)
+        for (var i = 0; i < Vk.MaxMemoryTypes; ++i)
+        {
             StatInfo.PostProcessCalcStatInfo(ref MemoryType[i]);
+        }
 
-        for (int i = 0; i < Vk.MaxMemoryHeaps; ++i)
+        for (var i = 0; i < Vk.MaxMemoryHeaps; ++i)
+        {
             StatInfo.PostProcessCalcStatInfo(ref MemoryHeap[i]);
+        }
     }
 }

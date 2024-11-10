@@ -20,14 +20,16 @@ public struct AllocationCreateInfo
 
     public object? UserData;
 
-    public AllocationCreateInfo(AllocationCreateFlags flags = default,
+    public AllocationCreateInfo(
+        AllocationCreateFlags flags = default,
         AllocationStrategyFlags strategy = default,
         MemoryUsage usage = default,
         MemoryPropertyFlags requiredFlags = default,
         MemoryPropertyFlags preferredFlags = default,
         uint memoryTypeBits = 0,
         VulkanMemoryPool? pool = null,
-        object? userData = null) {
+        object? userData = null)
+    {
         Flags = flags;
         Strategy = strategy;
         Usage = usage;

@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace VMASharp;
 
@@ -18,7 +16,6 @@ public enum AllocatorCreateFlags
 
     /// <summary>
     /// Enables usage of the VK_EXT_memory_budget extension.
-    /// 
     /// You may set this flag only if you found out that this device extension is supported,
     /// enabled it on the device passed through <see cref="VulkanMemoryAllocatorCreateInfo.LogicalDevice"/>,
     /// and you want it to be used internally by this library.

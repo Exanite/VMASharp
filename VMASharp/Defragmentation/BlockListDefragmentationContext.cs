@@ -1,6 +1,7 @@
-﻿using Silk.NET.Vulkan;
+﻿using System.Collections.Generic;
+using Silk.NET.Vulkan;
 
-namespace VMASharp.Defragmentation;
+;
 
 internal class BlockListDefragmentationContext
 {

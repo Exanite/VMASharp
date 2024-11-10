@@ -13,7 +13,8 @@ public struct AllocationRequest
 
     public AllocationRequestType Type;
 
-    public readonly long CalcCost() {
+    public readonly long CalcCost()
+    {
         return SumItemSize + ItemsToMakeLostCount * LostAllocationCost;
     }
 }

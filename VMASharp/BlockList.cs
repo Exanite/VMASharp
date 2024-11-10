@@ -1,19 +1,23 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using Silk.NET.Vulkan;
+using VMASharp.Defragmentation;
+using VMASharp.Metadata;
 
 namespace VMASharp;
-
-using Metadata;
 
 internal class BlockList : IDisposable
 {
     private const int AllocationTryCount = 32;
 
     private readonly List<VulkanMemoryBlock> _blocks = new();
-    private readonly ReaderWriterLockSlim    _mutex  = new(LockRecursionPolicy.NoRecursion);
+    private readonly ReaderWriterLockSlim _mutex = new(LockRecursionPolicy.NoRecursion);
 
-    private readonly int  _minBlockCount, _maxBlockCount;
+    private readonly int _minBlockCount, _maxBlockCount;
     private readonly bool _explicitBlockSize;
 
     private readonly Func<long, IBlockMetadata> _metaObjectCreate;
@@ -21,24 +25,35 @@ internal class BlockList : IDisposable
     private bool _hasEmptyBlock;
     private uint _nextBlockId;
 
-    public BlockList(VulkanMemoryAllocator allocator, VulkanMemoryPool? pool, int memoryTypeIndex,
-        long preferredBlockSize, int minBlockCount, int maxBlockCount, long bufferImageGranularity,
-        int frameInUseCount, bool explicitBlockSize, Func<long, IBlockMetadata> algorithm) {
+    public BlockList(
+        VulkanMemoryAllocator allocator,
+        VulkanMemoryPool? pool,
+        int memoryTypeIndex,
+        long preferredBlockSize,
+        int minBlockCount,
+        int maxBlockCount,
+        long bufferImageGranularity,
+        int frameInUseCount,
+        bool explicitBlockSize,
+        Func<long, IBlockMetadata> algorithm)
+    {
         Allocator = allocator;
         ParentPool = pool;
         MemoryTypeIndex = memoryTypeIndex;
         PreferredBlockSize = preferredBlockSize;
-        this._minBlockCount = minBlockCount;
-        this._maxBlockCount = maxBlockCount;
+        _minBlockCount = minBlockCount;
+        _maxBlockCount = maxBlockCount;
         BufferImageGranularity = bufferImageGranularity;
         FrameInUseCount = frameInUseCount;
-        this._explicitBlockSize = explicitBlockSize;
+        _explicitBlockSize = explicitBlockSize;
 
         _metaObjectCreate = algorithm;
     }
 
-    public void Dispose() {
-        foreach (VulkanMemoryBlock? block in _blocks) {
+    public void Dispose()
+    {
+        foreach (var block in _blocks)
+        {
             block.Dispose();
         }
     }
@@ -47,9 +62,7 @@ internal class BlockList : IDisposable
 
     public VulkanMemoryPool? ParentPool { get; }
 
-    public bool IsCustomPool {
-        get => ParentPool != null;
-    }
+    public bool IsCustomPool => ParentPool != null;
 
     public int MemoryTypeIndex { get; }
 
@@ -59,64 +72,71 @@ internal class BlockList : IDisposable
 
     public int FrameInUseCount { get; }
 
-    public bool IsEmpty {
-        get {
+    public bool IsEmpty
+    {
+        get
+        {
             _mutex.EnterReadLock();
 
-            try {
+            try
+            {
                 return _blocks.Count == 0;
             }
-            finally {
+            finally
+            {
                 _mutex.ExitReadLock();
             }
         }
     }
 
-    public bool IsCorruptedDetectionEnabled {
-        get => false;
-    }
+    public bool IsCorruptedDetectionEnabled => false;
 
-    public int BlockCount {
-        get => _blocks.Count;
-    }
+    public int BlockCount => _blocks.Count;
 
-    public VulkanMemoryBlock this[int index] {
-        get => _blocks[index];
-    }
+    public VulkanMemoryBlock this[int index] => _blocks[index];
 
     private IEnumerable<VulkanMemoryBlock> BlocksInReverse //Just gonna take advantage of C#...
     {
-        get {
-            List<VulkanMemoryBlock> localList = _blocks;
+        get
+        {
+            var localList = _blocks;
 
-            for (int index = localList.Count - 1; index >= 0; --index) {
+            for (var index = localList.Count - 1; index >= 0; --index)
+            {
                 yield return localList[index];
             }
         }
     }
 
-    public void CreateMinBlocks() {
-        if (_blocks.Count > 0) {
+    public void CreateMinBlocks()
+    {
+        if (_blocks.Count > 0)
+        {
             throw new InvalidOperationException("Block list not empty");
         }
 
-        for (int i = 0; i < _minBlockCount; ++i) {
-            Result res = CreateBlock(PreferredBlockSize, out _);
+        for (var i = 0; i < _minBlockCount; ++i)
+        {
+            var res = CreateBlock(PreferredBlockSize, out _);
 
-            if (res != Result.Success) {
+            if (res != Result.Success)
+            {
                 throw new AllocationException("Unable to allocate device memory block", res);
             }
         }
     }
 
-    public void GetPoolStats(out PoolStats stats) {
+    public void GetPoolStats(out PoolStats stats)
+    {
         _mutex.EnterReadLock();
 
-        try {
+        try
+        {
             stats = new PoolStats();
             stats.BlockCount = _blocks.Count;
 
-            foreach (VulkanMemoryBlock? block in _blocks) {
+            foreach (var block in _blocks)
+            {
                 Debug.Assert(block != null);
 
                 block.Validate();
@@ -124,43 +144,54 @@ internal class BlockList : IDisposable
                 block.MetaData.AddPoolStats(ref stats);
             }
         }
-        finally {
+        finally
+        {
             _mutex.ExitReadLock();
         }
     }
 
-    public Allocation Allocate(int currentFrame, long size, long alignment, in AllocationCreateInfo allocInfo,
-        SuballocationType suballocType) {
+    public Allocation Allocate(
+        int currentFrame,
+        long size,
+        long alignment,
+        in AllocationCreateInfo allocInfo,
+        SuballocationType suballocType)
+    {
         _mutex.EnterWriteLock();
 
-        try {
+        try
+        {
             return AllocatePage(currentFrame, size, alignment, allocInfo, suballocType);
         }
-        finally {
+        finally
+        {
             _mutex.ExitWriteLock();
         }
     }
 
-    public void Free(Allocation allocation) {
+    public void Free(Allocation allocation)
+    {
         VulkanMemoryBlock? blockToDelete = null;
 
         bool budgetExceeded;
         {
-            int heapIndex = Allocator.MemoryTypeIndexToHeapIndex(MemoryTypeIndex);
-            Allocator.GetBudget(heapIndex, out AllocationBudget budget);
+            var heapIndex = Allocator.MemoryTypeIndexToHeapIndex(MemoryTypeIndex);
+            Allocator.GetBudget(heapIndex, out var budget);
             budgetExceeded = budget.Usage >= budget.Budget;
         }
 
         _mutex.EnterWriteLock();
 
-        try {
-            BlockAllocation blockAlloc = (BlockAllocation)allocation;
+        try
+        {
+            var blockAlloc = (BlockAllocation)allocation;
 
-            VulkanMemoryBlock block = blockAlloc.Block;
+            var block = blockAlloc.Block;
 
             //Corruption Detection TODO
 
-            if (allocation.IsPersistantMapped) {
+            if (allocation.IsPersistantMapped)
+            {
                 block.Unmap(1);
             }
 
@@ -168,17 +199,22 @@ internal class BlockList : IDisposable
 
             block.Validate();
 
-            bool canDeleteBlock = _blocks.Count > _minBlockCount;
+            var canDeleteBlock = _blocks.Count > _minBlockCount;
 
-            if (block.MetaData.IsEmpty) {
-                if ((_hasEmptyBlock || budgetExceeded) && canDeleteBlock) {
+            if (block.MetaData.IsEmpty)
+            {
+                if ((_hasEmptyBlock || budgetExceeded) && canDeleteBlock)
+                {
                     blockToDelete = block;
                     Remove(block);
                 }
-            } else if (_hasEmptyBlock && canDeleteBlock) {
+            }
+            else if (_hasEmptyBlock && canDeleteBlock)
+            {
                 block = _blocks[^1];
 
-                if (block.MetaData.IsEmpty) {
+                if (block.MetaData.IsEmpty)
+                {
                     blockToDelete = block;
                     _blocks.RemoveAt(_blocks.Count - 1);
                 }
@@ -187,51 +223,59 @@ internal class BlockList : IDisposable
             UpdateHasEmptyBlock();
             IncrementallySortBlocks();
         }
-        finally {
+        finally
+        {
             _mutex.ExitWriteLock();
         }
 
-        if (blockToDelete != null) {
+        if (blockToDelete != null)
+        {
             blockToDelete.Dispose();
         }
     }
 
-    public void AddStats(Stats stats) {
-        int memTypeIndex = MemoryTypeIndex;
-        int memHeapIndex = Allocator.MemoryTypeIndexToHeapIndex(memTypeIndex);
+    public void AddStats(Stats stats)
+    {
+        var memTypeIndex = MemoryTypeIndex;
+        var memHeapIndex = Allocator.MemoryTypeIndexToHeapIndex(memTypeIndex);
 
         _mutex.EnterReadLock();
 
-        try {
-            foreach (VulkanMemoryBlock? block in _blocks) {
+        try
+        {
+            foreach (var block in _blocks)
+            {
                 Debug.Assert(block != null);
                 block.Validate();
 
-                block.MetaData.CalcAllocationStatInfo(out StatInfo info);
+                block.MetaData.CalcAllocationStatInfo(out var info);
                 StatInfo.Add(ref stats.Total, info);
                 StatInfo.Add(ref stats.MemoryType[memTypeIndex], info);
                 StatInfo.Add(ref stats.MemoryHeap[memHeapIndex], info);
             }
         }
-        finally {
+        finally
+        {
             _mutex.ExitReadLock();
         }
     }
 
     /// <summary>
-    /// 
     /// </summary>
     /// <param name="currentFrame"></param>
     /// <returns>
     /// Lost Allocation Count
     /// </returns>
-    public int MakePoolAllocationsLost(int currentFrame) {
+    public int MakePoolAllocationsLost(int currentFrame)
+    {
         _mutex.EnterWriteLock();
 
-        try {
-            int lostAllocationCount = 0;
+        try
+        {
+            var lostAllocationCount = 0;
 
-            foreach (VulkanMemoryBlock? block in _blocks) {
+            foreach (var block in _blocks)
+            {
                 Debug.Assert(block != null);
 
                 lostAllocationCount += block.MetaData.MakeAllocationsLost(currentFrame, FrameInUseCount);
@@ -239,29 +283,39 @@ internal class BlockList : IDisposable
 
             return lostAllocationCount;
         }
-        finally {
+        finally
+        {
             _mutex.ExitWriteLock();
         }
     }
 
-    public Result CheckCorruption() {
+    public Result CheckCorruption()
+    {
         throw new NotImplementedException();
     }
 
-    public int CalcAllocationCount() => _blocks.Sum(block => block.MetaData.AllocationCount);
+    public int CalcAllocationCount()
+    {
+        return _blocks.Sum(block => block.MetaData.AllocationCount);
+    }
 
-    public bool IsBufferImageGranularityConflictPossible() {
+    public bool IsBufferImageGranularityConflictPossible()
+    {
         if (BufferImageGranularity == 1)
+        {
             return false;
+        }
 
-        SuballocationType lastSuballocType = SuballocationType.Free;
+        var lastSuballocType = SuballocationType.Free;
 
-        foreach (VulkanMemoryBlock? block in _blocks) {
-            BlockMetadataGeneric? metadata = block.MetaData as BlockMetadataGeneric;
+        foreach (var block in _blocks)
+        {
+            var metadata = block.MetaData as BlockMetadataGeneric;
             Debug.Assert(metadata != null);
 
             if (metadata.IsBufferImageGranularityConflictPossible(BufferImageGranularity,
-                    ref lastSuballocType)) {
+                ref lastSuballocType))
+            {
                 return true;
             }
         }
@@ -269,17 +323,21 @@ internal class BlockList : IDisposable
         return false;
     }
 
-    private long CalcMaxBlockSize() {
+    private long CalcMaxBlockSize()
+    {
         long result = 0;
 
-        for (int i = _blocks.Count - 1; i >= 0; --i) {
-            long blockSize = _blocks[i].MetaData.Size;
+        for (var i = _blocks.Count - 1; i >= 0; --i)
+        {
+            var blockSize = _blocks[i].MetaData.Size;
 
-            if (result < blockSize) {
+            if (result < blockSize)
+            {
                 result = blockSize;
             }
 
-            if (result >= PreferredBlockSize) {
+            if (result >= PreferredBlockSize)
+            {
                 break;
             }
         }
@@ -288,27 +346,32 @@ internal class BlockList : IDisposable
     }
 
     [SkipLocalsInit]
-    private Allocation AllocatePage(int currentFrame, long size, long alignment, in AllocationCreateInfo createInfo,
-        SuballocationType suballocType) {
-        bool canMakeOtherLost = (createInfo.Flags & AllocationCreateFlags.CanMakeOtherLost) != 0;
-        bool mapped = (createInfo.Flags & AllocationCreateFlags.Mapped) != 0;
+    private Allocation AllocatePage(
+        int currentFrame,
+        long size,
+        long alignment,
+        in AllocationCreateInfo createInfo,
+        SuballocationType suballocType)
+    {
+        var canMakeOtherLost = (createInfo.Flags & AllocationCreateFlags.CanMakeOtherLost) != 0;
+        var mapped = (createInfo.Flags & AllocationCreateFlags.Mapped) != 0;
 
         long freeMemory;
 
         {
-            int heapIndex = Allocator.MemoryTypeIndexToHeapIndex(MemoryTypeIndex);
+            var heapIndex = Allocator.MemoryTypeIndexToHeapIndex(MemoryTypeIndex);
 
-            Allocator.GetBudget(heapIndex, out AllocationBudget heapBudget);
+            Allocator.GetBudget(heapIndex, out var heapBudget);
 
-            freeMemory = (heapBudget.Usage < heapBudget.Budget) ? (heapBudget.Budget - heapBudget.Usage) : 0;
+            freeMemory = heapBudget.Usage < heapBudget.Budget ? heapBudget.Budget - heapBudget.Usage : 0;
         }
 
-        bool canFallbackToDedicated = !IsCustomPool;
-        bool canCreateNewBlock = ((createInfo.Flags & AllocationCreateFlags.NeverAllocate) == 0) &&
-                                 (_blocks.Count < _maxBlockCount) &&
-                                 (freeMemory >= size || !canFallbackToDedicated);
+        var canFallbackToDedicated = !IsCustomPool;
+        var canCreateNewBlock = (createInfo.Flags & AllocationCreateFlags.NeverAllocate) == 0 &&
+            _blocks.Count < _maxBlockCount &&
+            (freeMemory >= size || !canFallbackToDedicated);
 
-        AllocationStrategyFlags strategy = createInfo.Strategy;
+        var strategy = createInfo.Strategy;
 
         //if (this.algorithm == (uint)PoolCreateFlags.LinearAlgorithm && this.maxBlockCount > 1)
         //{
@@ -320,9 +383,11 @@ internal class BlockList : IDisposable
         //    throw new AllocationException("Upper address allocation unavailable", Result.ErrorFeatureNotPresent);
         //}
 
-        switch (strategy) {
+        switch (strategy)
+        {
             case 0:
                 strategy = AllocationStrategyFlags.BestFit;
+
                 break;
             case AllocationStrategyFlags.BestFit:
             case AllocationStrategyFlags.WorstFit:
@@ -332,7 +397,8 @@ internal class BlockList : IDisposable
                 throw new AllocationException("Invalid allocation strategy", Result.ErrorFeatureNotPresent);
         }
 
-        if (size + 2 * Helpers.DebugMargin > PreferredBlockSize) {
+        if (size + 2 * Helpers.DebugMargin > PreferredBlockSize)
+        {
             throw new AllocationException("Allocation size larger than block size", Result.ErrorOutOfDeviceMemory);
         }
 
@@ -348,23 +414,31 @@ internal class BlockList : IDisposable
 
         Allocation? alloc;
 
-        if (!canMakeOtherLost || canCreateNewBlock) {
-            AllocationCreateFlags allocFlagsCopy = createInfo.Flags & ~AllocationCreateFlags.CanMakeOtherLost;
+        if (!canMakeOtherLost || canCreateNewBlock)
+        {
+            var allocFlagsCopy = createInfo.Flags & ~AllocationCreateFlags.CanMakeOtherLost;
 
-            if (strategy == AllocationStrategyFlags.BestFit) {
-                foreach (VulkanMemoryBlock? block in _blocks) {
+            if (strategy == AllocationStrategyFlags.BestFit)
+            {
+                foreach (var block in _blocks)
+                {
                     alloc = AllocateFromBlock(block, in context, allocFlagsCopy, createInfo.UserData);
 
-                    if (alloc != null) {
+                    if (alloc != null)
+                    {
                         //Possibly Log here
                         return alloc;
                     }
                 }
-            } else {
-                foreach (VulkanMemoryBlock? curBlock in BlocksInReverse) {
+            }
+            else
+            {
+                foreach (var curBlock in BlocksInReverse)
+                {
                     alloc = AllocateFromBlock(curBlock, in context, allocFlagsCopy, createInfo.UserData);
 
-                    if (alloc != null) {
+                    if (alloc != null)
+                    {
                         //Possibly Log here
                         return alloc;
                     }
@@ -372,98 +446,125 @@ internal class BlockList : IDisposable
             }
         }
 
-        if (canCreateNewBlock) {
-            AllocationCreateFlags allocFlagsCopy = createInfo.Flags & ~AllocationCreateFlags.CanMakeOtherLost;
+        if (canCreateNewBlock)
+        {
+            var allocFlagsCopy = createInfo.Flags & ~AllocationCreateFlags.CanMakeOtherLost;
 
-            long newBlockSize = PreferredBlockSize;
-            int newBlockSizeShift = 0;
+            var newBlockSize = PreferredBlockSize;
+            var newBlockSizeShift = 0;
             const int newBlockSizeShiftMax = 3;
 
-            if (!_explicitBlockSize) {
-                long maxExistingBlockSize = CalcMaxBlockSize();
+            if (!_explicitBlockSize)
+            {
+                var maxExistingBlockSize = CalcMaxBlockSize();
 
-                for (int i = 0; i < newBlockSizeShiftMax; ++i) {
-                    long smallerNewBlockSize = newBlockSize / 2;
-                    if (smallerNewBlockSize > maxExistingBlockSize && smallerNewBlockSize >= size * 2) {
+                for (var i = 0; i < newBlockSizeShiftMax; ++i)
+                {
+                    var smallerNewBlockSize = newBlockSize / 2;
+                    if (smallerNewBlockSize > maxExistingBlockSize && smallerNewBlockSize >= size * 2)
+                    {
                         newBlockSize = smallerNewBlockSize;
                         newBlockSizeShift += 1;
-                    } else {
+                    }
+                    else
+                    {
                         break;
                     }
                 }
             }
 
-            int newBlockIndex = 0;
+            var newBlockIndex = 0;
 
-            Result res = (newBlockSize <= freeMemory || !canFallbackToDedicated)
+            var res = newBlockSize <= freeMemory || !canFallbackToDedicated
                 ? CreateBlock(newBlockSize, out newBlockIndex)
                 : Result.ErrorOutOfDeviceMemory;
 
-            if (!_explicitBlockSize) {
-                while (res < 0 && newBlockSizeShift < newBlockSizeShiftMax) {
-                    long smallerNewBlockSize = newBlockSize / 2;
+            if (!_explicitBlockSize)
+            {
+                while (res < 0 && newBlockSizeShift < newBlockSizeShiftMax)
+                {
+                    var smallerNewBlockSize = newBlockSize / 2;
 
-                    if (smallerNewBlockSize >= size) {
+                    if (smallerNewBlockSize >= size)
+                    {
                         newBlockSize = smallerNewBlockSize;
                         newBlockSizeShift += 1;
-                        res = (newBlockSize <= freeMemory || !canFallbackToDedicated)
+                        res = newBlockSize <= freeMemory || !canFallbackToDedicated
                             ? CreateBlock(newBlockSize, out newBlockIndex)
                             : Result.ErrorOutOfDeviceMemory;
-                    } else {
+                    }
+                    else
+                    {
                         break;
                     }
                 }
             }
 
-            if (res == Result.Success) {
-                VulkanMemoryBlock block = _blocks[newBlockIndex];
+            if (res == Result.Success)
+            {
+                var block = _blocks[newBlockIndex];
 
                 alloc = AllocateFromBlock(block, in context, allocFlagsCopy, createInfo.UserData);
 
-                if (alloc != null) {
+                if (alloc != null)
+                {
                     //Possibly Log here
                     return alloc;
                 }
             }
         }
 
-        if (canMakeOtherLost) {
-            int tryIndex = 0;
+        if (canMakeOtherLost)
+        {
+            var tryIndex = 0;
 
-            for (; tryIndex < AllocationTryCount; ++tryIndex) {
+            for (; tryIndex < AllocationTryCount; ++tryIndex)
+            {
                 VulkanMemoryBlock? bestRequestBlock = null;
 
                 Unsafe.SkipInit(out AllocationRequest bestAllocRequest);
 
-                long bestRequestCost = long.MaxValue;
+                var bestRequestCost = long.MaxValue;
 
-                if (strategy == AllocationStrategyFlags.BestFit) {
-                    foreach (VulkanMemoryBlock? curBlock in _blocks) {
-                        if (curBlock.MetaData.TryCreateAllocationRequest(in context, out AllocationRequest request)) {
-                            long currRequestCost = request.CalcCost();
+                if (strategy == AllocationStrategyFlags.BestFit)
+                {
+                    foreach (var curBlock in _blocks)
+                    {
+                        if (curBlock.MetaData.TryCreateAllocationRequest(in context, out var request))
+                        {
+                            var currRequestCost = request.CalcCost();
 
-                            if (bestRequestBlock == null || currRequestCost < bestRequestCost) {
+                            if (bestRequestBlock == null || currRequestCost < bestRequestCost)
+                            {
                                 bestRequestBlock = curBlock;
                                 bestAllocRequest = request;
                                 bestRequestCost = currRequestCost;
 
                                 if (bestRequestCost == 0)
+                                {
                                     break;
+                                }
                             }
                         }
                     }
-                } else {
-                    foreach (VulkanMemoryBlock? curBlock in BlocksInReverse) {
-                        if (curBlock.MetaData.TryCreateAllocationRequest(in context, out AllocationRequest request)) {
-                            long curRequestCost = request.CalcCost();
+                }
+                else
+                {
+                    foreach (var curBlock in BlocksInReverse)
+                    {
+                        if (curBlock.MetaData.TryCreateAllocationRequest(in context, out var request))
+                        {
+                            var curRequestCost = request.CalcCost();
 
                             if (bestRequestBlock == null || curRequestCost < bestRequestCost ||
-                                strategy == AllocationStrategyFlags.FirstFit) {
+                                strategy == AllocationStrategyFlags.FirstFit)
+                            {
                                 bestRequestBlock = curBlock;
                                 bestRequestCost = curRequestCost;
                                 bestAllocRequest = request;
 
-                                if (bestRequestCost == 0 || strategy == AllocationStrategyFlags.FirstFit) {
+                                if (bestRequestCost == 0 || strategy == AllocationStrategyFlags.FirstFit)
+                                {
                                     break;
                                 }
                             }
@@ -471,13 +572,16 @@ internal class BlockList : IDisposable
                     }
                 }
 
-                if (bestRequestBlock != null) {
-                    if (mapped) {
+                if (bestRequestBlock != null)
+                {
+                    if (mapped)
+                    {
                         bestRequestBlock.Map(1);
                     }
 
                     if (bestRequestBlock.MetaData.MakeRequestedAllocationsLost(currentFrame, FrameInUseCount,
-                            ref bestAllocRequest)) {
+                        ref bestAllocRequest))
+                    {
                         BlockAllocation talloc = new(Allocator, Allocator.CurrentFrameIndex);
 
                         bestRequestBlock.MetaData.Alloc(in bestAllocRequest, suballocType, size, talloc);
@@ -486,11 +590,14 @@ internal class BlockList : IDisposable
 
                         //(allocation as BlockAllocation).InitBlockAllocation();
 
-                        try {
+                        try
+                        {
                             bestRequestBlock.Validate(); //Won't be called in release builds
                         }
-                        catch {
+                        catch
+                        {
                             talloc.Dispose();
+
                             throw;
                         }
 
@@ -503,12 +610,15 @@ internal class BlockList : IDisposable
 
                         return talloc;
                     }
-                } else {
+                }
+                else
+                {
                     break;
                 }
             }
 
-            if (tryIndex == AllocationTryCount) {
+            if (tryIndex == AllocationTryCount)
+            {
                 throw new AllocationException("", Result.ErrorTooManyObjects);
             }
         }
@@ -516,15 +626,21 @@ internal class BlockList : IDisposable
         throw new AllocationException("Unable to allocate memory");
     }
 
-    private Allocation? AllocateFromBlock(VulkanMemoryBlock block, in AllocationContext context,
-        AllocationCreateFlags flags, object? userData) {
+    private Allocation? AllocateFromBlock(
+        VulkanMemoryBlock block,
+        in AllocationContext context,
+        AllocationCreateFlags flags,
+        object? userData)
+    {
         Debug.Assert((flags & AllocationCreateFlags.CanMakeOtherLost) == 0);
-        bool mapped = (flags & AllocationCreateFlags.Mapped) != 0;
+        var mapped = (flags & AllocationCreateFlags.Mapped) != 0;
 
-        if (block.MetaData.TryCreateAllocationRequest(in context, out AllocationRequest request)) {
+        if (block.MetaData.TryCreateAllocationRequest(in context, out var request))
+        {
             Debug.Assert(request.ItemsToMakeLostCount == 0);
 
-            if (mapped) {
+            if (mapped)
+            {
                 block.Map(1);
             }
 
@@ -551,10 +667,12 @@ internal class BlockList : IDisposable
         return null;
     }
 
-    private unsafe Result CreateBlock(long blockSize, out int newBlockIndex) {
+    private unsafe Result CreateBlock(long blockSize, out int newBlockIndex)
+    {
         newBlockIndex = -1;
 
-        MemoryAllocateInfo info = new() {
+        MemoryAllocateInfo info = new()
+        {
             SType = StructureType.MemoryAllocateInfo,
             MemoryTypeIndex = (uint)MemoryTypeIndex,
             AllocationSize = (ulong)blockSize,
@@ -562,20 +680,23 @@ internal class BlockList : IDisposable
 
         // Every standalone block can potentially contain a buffer with BufferUsageFlags.BufferUsageShaderDeviceAddressBitKhr - always enable the feature
         MemoryAllocateFlagsInfoKHR allocFlagsInfo = new(StructureType.MemoryAllocateFlagsInfoKhr);
-        if (Allocator.UseKhrBufferDeviceAddress) {
+        if (Allocator.UseKhrBufferDeviceAddress)
+        {
             allocFlagsInfo.Flags = MemoryAllocateFlags.AddressBitKhr;
             info.PNext = &allocFlagsInfo;
         }
 
-        Result res = Allocator.AllocateVulkanMemory(in info, out DeviceMemory mem);
+        var res = Allocator.AllocateVulkanMemory(in info, out var mem);
 
-        if (res < 0) {
+        if (res < 0)
+        {
             return res;
         }
 
-        IBlockMetadata metaObject = _metaObjectCreate(blockSize);
+        var metaObject = _metaObjectCreate(blockSize);
 
-        if (metaObject.Size != blockSize) {
+        if (metaObject.Size != blockSize)
+        {
             throw new InvalidOperationException("Returned Metadata object reports incorrect block size");
         }
 
@@ -588,12 +709,21 @@ internal class BlockList : IDisposable
         return Result.Success;
     }
 
-    private void FreeEmptyBlocks(ref Defragmentation.DefragmentationStats stats) {
-        for (int i = _blocks.Count - 1; i >= 0; --i) {
-            VulkanMemoryBlock block = _blocks[i];
+    private void FreeEmptyBlocks(ref DefragmentationStats stats)
+    {
+        for (var i = _blocks.Count - 1; i >= 0; --i)
+        {
+            var block = _blocks[i];
 
-            if (!block.MetaData.IsEmpty) continue;
-            if (_blocks.Count <= _minBlockCount) break;
+            if (!block.MetaData.IsEmpty)
+            {
+                continue;
+            }
+
+            if (_blocks.Count <= _minBlockCount)
+            {
+                break;
+            }
 
             stats.DeviceMemoryBlocksFreed += 1;
             stats.BytesFreed += block.MetaData.Size;
@@ -605,26 +735,33 @@ internal class BlockList : IDisposable
         UpdateHasEmptyBlock();
     }
 
-    private void UpdateHasEmptyBlock() {
+    private void UpdateHasEmptyBlock()
+    {
         _hasEmptyBlock = _blocks.Any(b => !b.MetaData.IsEmpty);
     }
 
-    private void Remove(VulkanMemoryBlock block) {
-        bool res = _blocks.Remove(block);
+    private void Remove(VulkanMemoryBlock block)
+    {
+        var res = _blocks.Remove(block);
         Debug.Assert(res, "");
     }
 
-    private void IncrementallySortBlocks() {
-        if (_blocks.Count > 1) {
-            VulkanMemoryBlock prevBlock = _blocks[0];
-            int i = 1;
+    private void IncrementallySortBlocks()
+    {
+        if (_blocks.Count > 1)
+        {
+            var prevBlock = _blocks[0];
+            var i = 1;
 
-            do {
-                VulkanMemoryBlock curBlock = _blocks[i];
+            do
+            {
+                var curBlock = _blocks[i];
 
-                if (prevBlock.MetaData.SumFreeSize > curBlock.MetaData.SumFreeSize) {
+                if (prevBlock.MetaData.SumFreeSize > curBlock.MetaData.SumFreeSize)
+                {
                     _blocks[i - 1] = curBlock;
                     _blocks[i] = prevBlock;
+
                     return;
                 }
 
@@ -638,7 +775,8 @@ internal class BlockList : IDisposable
     {
         private readonly BlockList _list;
 
-        public DefragmentationContext(BlockList list) {
+        public DefragmentationContext(BlockList list)
+        {
             _list = list;
         }
 

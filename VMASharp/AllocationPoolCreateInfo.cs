@@ -1,4 +1,7 @@
-﻿namespace VMASharp;
+﻿using System;
+using VMASharp.Metadata;
+
+namespace VMASharp;
 
 public struct AllocationPoolCreateInfo
 {
@@ -17,15 +20,17 @@ public struct AllocationPoolCreateInfo
 
     public int FrameInUseCount;
 
-    public Func<long, Metadata.IBlockMetadata>? AllocationAlgorithmCreate;
+    public Func<long, IBlockMetadata>? AllocationAlgorithmCreate;
 
-    public AllocationPoolCreateInfo(int memoryTypeIndex,
+    public AllocationPoolCreateInfo(
+        int memoryTypeIndex,
         PoolCreateFlags flags = 0,
         long blockSize = 0,
         int minBlockCount = 0,
         int maxBlockCount = 0,
         int frameInUseCount = 0,
-        Func<long, Metadata.IBlockMetadata>? allocationAlgorithemCreate = null) {
+        Func<long, IBlockMetadata>? allocationAlgorithemCreate = null)
+    {
         MemoryTypeIndex = memoryTypeIndex;
         Flags = flags;
         BlockSize = blockSize;

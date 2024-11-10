@@ -1,10 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Threading;
 using System.Runtime.CompilerServices;
-using JetBrains.Annotations;
+using System.Threading;
 using Silk.NET.Vulkan;
-using VMASharp;
 
 namespace VMASharp;
 
@@ -23,20 +20,26 @@ public sealed class VulkanMemoryPool : IDisposable
 
     internal readonly BlockList BlockList;
 
-    internal VulkanMemoryPool(VulkanMemoryAllocator allocator, in AllocationPoolCreateInfo poolInfo,
-        long preferredBlockSize) {
-        if (allocator is null) {
+    internal VulkanMemoryPool(
+        VulkanMemoryAllocator allocator,
+        in AllocationPoolCreateInfo poolInfo,
+        long preferredBlockSize)
+    {
+        if (allocator is null)
+        {
             throw new ArgumentNullException(nameof(allocator));
         }
 
         Allocator = allocator;
 
-        ref int tmpRef = ref Unsafe.As<uint, int>(ref allocator.NextPoolId);
+        ref var tmpRef = ref Unsafe.As<uint, int>(ref allocator.NextPoolId);
 
         ID = (uint)Interlocked.Increment(ref tmpRef);
 
         if (ID == 0)
+        {
             throw new OverflowException();
+        }
 
         BlockList = new BlockList(
             allocator,
@@ -56,22 +59,26 @@ public sealed class VulkanMemoryPool : IDisposable
     }
 
     [PublicAPI]
-    public void Dispose() {
+    public void Dispose()
+    {
         Allocator.DestroyPool(this);
     }
 
     [PublicAPI]
-    public int MakeAllocationsLost() {
+    public int MakeAllocationsLost()
+    {
         return Allocator.MakePoolAllocationsLost(this);
     }
 
     [PublicAPI]
-    public Result CheckForCorruption() {
+    public Result CheckForCorruption()
+    {
         return Allocator.CheckPoolCorruption(this);
     }
 
     [PublicAPI]
-    public void GetPoolStats(out PoolStats stats) {
+    public void GetPoolStats(out PoolStats stats)
+    {
         Allocator.GetPoolStats(this, out stats);
     }
 }

@@ -1,263 +1,261 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-
 using Silk.NET.Core.Native;
 using Silk.NET.Vulkan;
 using Silk.NET.Vulkan.Extensions.KHR;
+using VMASharp;
 
-namespace VulkanCube
+namespace VulkanCube;
+
+public unsafe abstract class DeviceCreationExample : InstanceCreationExample
 {
-    public unsafe abstract class DeviceCreationExample : InstanceCreationExample
+    private static readonly string[] RequiredDeviceExtensions = { "VK_KHR_swapchain" };
+
+    protected readonly PhysicalDevice PhysicalDevice;
+    protected readonly QueueFamilyIndices QueueIndices;
+    protected readonly Device Device;
+    protected readonly Queue GraphicsQueue, PresentQueue;
+    protected readonly KhrSwapchain VkSwapchain;
+
+    protected DeviceCreationExample()
     {
-        private static readonly string[] RequiredDeviceExtensions = new[] { "VK_KHR_swapchain" };
+        PhysicalDevice = SelectPhysicalDevice(out QueueIndices);
+        Device = CreateLogicalDevice(out GraphicsQueue, out PresentQueue);
 
-        protected readonly PhysicalDevice PhysicalDevice;
-        protected readonly QueueFamilyIndices QueueIndices;
-        protected readonly Device Device;
-        protected readonly Queue GraphicsQueue, PresentQueue;
-        protected readonly KhrSwapchain VkSwapchain;
-
-        protected DeviceCreationExample() : base()
+        if (!VkApi.TryGetDeviceExtension(Instance, Device, out VkSwapchain))
         {
-            this.PhysicalDevice = SelectPhysicalDevice(out this.QueueIndices);
-            this.Device = CreateLogicalDevice(out this.GraphicsQueue, out this.PresentQueue);
+            throw new Exception("VK_KHR_Swapchain is missing or not specified");
+        }
+    }
 
-            if (!VkApi.TryGetDeviceExtension(this.Instance, this.Device, out this.VkSwapchain))
+    public override void Dispose()
+    {
+        VkSwapchain.Dispose();
+
+        VkApi.DestroyDevice(Device, null);
+
+        base.Dispose();
+    }
+
+    private PhysicalDevice SelectPhysicalDevice(out QueueFamilyIndices indices)
+    {
+        uint count = 0;
+        var res = VkApi.EnumeratePhysicalDevices(Instance, &count, null);
+
+        if (res != Result.Success)
+        {
+            throw new VulkanResultException("Unable to enumerate physical devices", res);
+        }
+
+        if (count == 0)
+        {
+            throw new Exception("No physical devices found!");
+        }
+
+        var deviceList = stackalloc PhysicalDevice[(int)count];
+
+        res = VkApi.EnumeratePhysicalDevices(Instance, &count, deviceList);
+
+        if (res != Result.Success)
+        {
+            throw new VulkanResultException("Unable to enumerate physical devices", res);
+        }
+
+        for (uint i = 0; i < count; ++i)
+        {
+            var device = deviceList[i];
+
+            if (IsDeviceSuitable(device, out indices))
             {
-                throw new Exception("VK_KHR_Swapchain is missing or not specified");
+                return device;
             }
         }
 
-        public override void Dispose()
+        throw new Exception("No suitable device found!");
+    }
+
+    private Device CreateLogicalDevice(out Queue GraphicsQueue, out Queue PresentQueue)
+    {
+        var queueInfos = stackalloc DeviceQueueCreateInfo[2];
+        uint infoCount = 1;
+        var queuePriority = 1f;
+
+        queueInfos[0] = new DeviceQueueCreateInfo(queueFamilyIndex: (uint)QueueIndices.GraphicsFamily, queueCount: 1, pQueuePriorities: &queuePriority);
+
+        if (QueueIndices.GraphicsFamily != QueueIndices.PresentFamily)
         {
-            VkSwapchain.Dispose();
+            infoCount = 2;
 
-            VkApi.DestroyDevice(this.Device, null);
-
-            base.Dispose();
+            queueInfos[1] = new DeviceQueueCreateInfo(queueFamilyIndex: (uint)QueueIndices.PresentFamily, queueCount: 1, pQueuePriorities: &queuePriority);
         }
 
-        private PhysicalDevice SelectPhysicalDevice(out QueueFamilyIndices indices)
+        PhysicalDeviceFeatures features = default;
+
+        using var extensionNames = SilkMarshal.StringArrayToMemory(RequiredDeviceExtensions);
+
+        var depthStencilFeature = new PhysicalDeviceSeparateDepthStencilLayoutsFeatures
         {
-            uint count = 0;
-            var res = VkApi.EnumeratePhysicalDevices(this.Instance, &count, null);
+            SType = StructureType.PhysicalDeviceSeparateDepthStencilLayoutsFeatures,
+            SeparateDepthStencilLayouts = true,
+        };
 
-            if (res != Result.Success)
-            {
-                throw new VMASharp.VulkanResultException("Unable to enumerate physical devices", res);
-            }
+        var createInfo = new DeviceCreateInfo
+        {
+            SType = StructureType.DeviceCreateInfo,
+            //PNext = &depthStencilFeature,
+            QueueCreateInfoCount = infoCount,
+            PQueueCreateInfos = queueInfos,
+            EnabledExtensionCount = (uint)RequiredDeviceExtensions.Length,
+            PpEnabledExtensionNames = (byte**)extensionNames,
+            PEnabledFeatures = &features,
+        };
 
-            if (count == 0)
-            {
-                throw new Exception("No physical devices found!");
-            }
+        Device device;
+        var res = VkApi.CreateDevice(PhysicalDevice, &createInfo, null, &device);
 
-            PhysicalDevice* deviceList = stackalloc PhysicalDevice[(int)count];
-
-            res = VkApi.EnumeratePhysicalDevices(this.Instance, &count, deviceList);
-
-            if (res != Result.Success)
-            {
-                throw new VMASharp.VulkanResultException("Unable to enumerate physical devices", res);
-            }
-
-            for (uint i = 0; i < count; ++i)
-            {
-                var device = deviceList[i];
-
-                if (IsDeviceSuitable(device, out indices))
-                {
-                    return device;
-                }
-            }
-
-            throw new Exception("No suitable device found!");
+        if (res != Result.Success)
+        {
+            throw new VulkanResultException("Logical Device Creation Failed!", res);
         }
 
-        private Device CreateLogicalDevice(out Queue GraphicsQueue, out Queue PresentQueue)
+        Queue queue = default;
+        VkApi.GetDeviceQueue(device, (uint)QueueIndices.GraphicsFamily, 0, &queue);
+
+        GraphicsQueue = queue;
+
+        if (QueueIndices.GraphicsFamily != QueueIndices.PresentFamily)
         {
-            var queueInfos = stackalloc DeviceQueueCreateInfo[2];
-            uint infoCount = 1;
-            float queuePriority = 1f;
-
-            queueInfos[0] = new DeviceQueueCreateInfo(queueFamilyIndex: (uint)this.QueueIndices.GraphicsFamily, queueCount: 1, pQueuePriorities: &queuePriority);
-
-            if (this.QueueIndices.GraphicsFamily != this.QueueIndices.PresentFamily)
-            {
-                infoCount = 2;
-
-                queueInfos[1] = new DeviceQueueCreateInfo(queueFamilyIndex: (uint)this.QueueIndices.PresentFamily, queueCount: 1, pQueuePriorities: &queuePriority);
-            }
-
-            PhysicalDeviceFeatures features = default;
-
-            using var extensionNames = SilkMarshal.StringArrayToMemory(RequiredDeviceExtensions);
-
-            PhysicalDeviceSeparateDepthStencilLayoutsFeatures depthStencilFeature = new PhysicalDeviceSeparateDepthStencilLayoutsFeatures
-            {
-                SType = StructureType.PhysicalDeviceSeparateDepthStencilLayoutsFeatures,
-                SeparateDepthStencilLayouts = true
-            };
-
-            DeviceCreateInfo createInfo = new DeviceCreateInfo
-            {
-                SType = StructureType.DeviceCreateInfo,
-                //PNext = &depthStencilFeature,
-                QueueCreateInfoCount = infoCount,
-                PQueueCreateInfos = queueInfos,
-                EnabledExtensionCount = (uint)RequiredDeviceExtensions.Length,
-                PpEnabledExtensionNames = (byte**)extensionNames,
-                PEnabledFeatures = &features
-            };
-
-            Device device;
-            var res = VkApi.CreateDevice(this.PhysicalDevice, &createInfo, null, &device);
-
-            if (res != Result.Success)
-            {
-                throw new VMASharp.VulkanResultException("Logical Device Creation Failed!", res);
-            }
-
-            Queue queue = default;
-            VkApi.GetDeviceQueue(device, (uint)this.QueueIndices.GraphicsFamily, 0, &queue);
-
-            GraphicsQueue = queue;
-
-            if (this.QueueIndices.GraphicsFamily != this.QueueIndices.PresentFamily)
-            {
-                queue = default;
-                VkApi.GetDeviceQueue(device, (uint)this.QueueIndices.PresentFamily, 0, &queue);
-            }
-
-            PresentQueue = queue;
-
-            return device;
+            queue = default;
+            VkApi.GetDeviceQueue(device, (uint)QueueIndices.PresentFamily, 0, &queue);
         }
 
-        private bool IsDeviceSuitable(PhysicalDevice device, out QueueFamilyIndices indices)
+        PresentQueue = queue;
+
+        return device;
+    }
+
+    private bool IsDeviceSuitable(PhysicalDevice device, out QueueFamilyIndices indices)
+    {
+        FindQueueFamilies(device, out indices);
+
+        return indices.IsComplete() && HasAllRequiredExtensions(device) && IsSwapchainSupportAdequate(device);
+    }
+
+    private void FindQueueFamilies(PhysicalDevice device, out QueueFamilyIndices indices)
+    {
+        indices = new QueueFamilyIndices();
+
+        var families = QuerryQueueFamilyProperties(device);
+
+        for (var i = 0; i < families.Length; ++i)
         {
-            FindQueueFamilies(device, out indices);
+            ref var queueFamily = ref families[i];
 
-            return indices.IsComplete() && HasAllRequiredExtensions(device) && IsSwapchainSupportAdequate(device);
-        }
+            const QueueFlags GraphicsQueueBits = QueueFlags.QueueGraphicsBit | QueueFlags.QueueTransferBit;
 
-        private void FindQueueFamilies(PhysicalDevice device, out QueueFamilyIndices indices)
-        {
-            indices = new QueueFamilyIndices();
-
-            var families = QuerryQueueFamilyProperties(device);
-
-            for (int i = 0; i < families.Length; ++i)
+            if ((queueFamily.QueueFlags & GraphicsQueueBits) == GraphicsQueueBits)
             {
-                ref QueueFamilyProperties queueFamily = ref families[i];
-
-                const QueueFlags GraphicsQueueBits = QueueFlags.QueueGraphicsBit | QueueFlags.QueueTransferBit;
-
-                if ((queueFamily.QueueFlags & GraphicsQueueBits) == GraphicsQueueBits)
-                {
-                    indices.GraphicsFamily = (uint)i;
-                }
-
-                var res = VkSurface.GetPhysicalDeviceSurfaceSupport(device, (uint)i, this.WindowSurface, out var presentSupport);
-
-                if (res == Result.Success && presentSupport)
-                {
-                    indices.PresentFamily = (uint)i;
-                }
-
-                if (indices.IsComplete())
-                {
-                    break;
-                }
-            }
-        }
-
-        private static QueueFamilyProperties[] QuerryQueueFamilyProperties(PhysicalDevice device)
-        {
-            uint count = 0;
-            VkApi.GetPhysicalDeviceQueueFamilyProperties(device, &count, null);
-
-            if (count == 0)
-            {
-                return Array.Empty<QueueFamilyProperties>();
+                indices.GraphicsFamily = (uint)i;
             }
 
-            var arr = new QueueFamilyProperties[count];
+            var res = VkSurface.GetPhysicalDeviceSurfaceSupport(device, (uint)i, WindowSurface, out var presentSupport);
 
-            fixed (QueueFamilyProperties* pProperties = arr)
+            if (res == Result.Success && presentSupport)
             {
-                VkApi.GetPhysicalDeviceQueueFamilyProperties(device, &count, pProperties);
+                indices.PresentFamily = (uint)i;
             }
 
-            return arr;
+            if (indices.IsComplete())
+            {
+                break;
+            }
+        }
+    }
+
+    private static QueueFamilyProperties[] QuerryQueueFamilyProperties(PhysicalDevice device)
+    {
+        uint count = 0;
+        VkApi.GetPhysicalDeviceQueueFamilyProperties(device, &count, null);
+
+        if (count == 0)
+        {
+            return Array.Empty<QueueFamilyProperties>();
         }
 
-        private static bool HasAllRequiredExtensions(PhysicalDevice device)
-        {
-            uint count = 0;
-            var res = VkApi.EnumerateDeviceExtensionProperties(device, (byte*)null, &count, null);
+        var arr = new QueueFamilyProperties[count];
 
-            if (res != Result.Success || count == 0)
+        fixed (QueueFamilyProperties* pProperties = arr)
+        {
+            VkApi.GetPhysicalDeviceQueueFamilyProperties(device, &count, pProperties);
+        }
+
+        return arr;
+    }
+
+    private static bool HasAllRequiredExtensions(PhysicalDevice device)
+    {
+        uint count = 0;
+        var res = VkApi.EnumerateDeviceExtensionProperties(device, (byte*)null, &count, null);
+
+        if (res != Result.Success || count == 0)
+        {
+            return false;
+        }
+
+        var pExtensions = stackalloc ExtensionProperties[(int)count];
+
+        res = VkApi.EnumerateDeviceExtensionProperties(device, (byte*)null, &count, pExtensions);
+
+        if (res != Result.Success)
+        {
+            return false;
+        }
+
+        var extensions = new HashSet<string>((int)count, StringComparer.OrdinalIgnoreCase);
+
+        for (uint i = 0; i < count; ++i)
+        {
+            var name = SilkMarshal.PtrToString((nint)pExtensions[i].ExtensionName);
+
+            extensions.Add(name);
+        }
+
+        foreach (var ext in RequiredDeviceExtensions)
+        {
+            if (!extensions.Contains(ext))
             {
                 return false;
             }
-
-            var pExtensions = stackalloc ExtensionProperties[(int)count];
-
-            res = VkApi.EnumerateDeviceExtensionProperties(device, (byte*)null, &count, pExtensions);
-
-            if (res != Result.Success)
-            {
-                return false;
-            }
-
-            HashSet<string> extensions = new HashSet<string>((int)count, StringComparer.OrdinalIgnoreCase);
-
-            for (uint i = 0; i < count; ++i)
-            {
-                string name = SilkMarshal.PtrToString((nint)pExtensions[i].ExtensionName);
-
-                extensions.Add(name);
-            }
-
-            foreach (var ext in RequiredDeviceExtensions)
-            {
-                if (!extensions.Contains(ext))
-                {
-                    return false;
-                }
-            }
-
-            return true;
         }
 
-        private bool IsSwapchainSupportAdequate(PhysicalDevice device) //If there are either no surface formats or no present modes supported, then this method returns false.
+        return true;
+    }
+
+    private bool IsSwapchainSupportAdequate(PhysicalDevice device) //If there are either no surface formats or no present modes supported, then this method returns false.
+    {
+        uint count = 0;
+
+        VkSurface.GetPhysicalDeviceSurfaceFormats(device, WindowSurface, &count, null);
+
+        if (count == 0)
         {
-            uint count = 0;
-
-            VkSurface.GetPhysicalDeviceSurfaceFormats(device, this.WindowSurface, &count, null);
-
-            if (count == 0)
-            {
-                return false;
-            }
-
-            count = 0;
-            VkSurface.GetPhysicalDeviceSurfacePresentModes(device, this.WindowSurface, &count, null);
-
-            return count != 0;
+            return false;
         }
 
-        protected struct QueueFamilyIndices
-        {
-            public uint? GraphicsFamily;
-            public uint? PresentFamily;
+        count = 0;
+        VkSurface.GetPhysicalDeviceSurfacePresentModes(device, WindowSurface, &count, null);
 
-            public bool IsComplete()
-            {
-                return GraphicsFamily.HasValue && PresentFamily.HasValue;
-            }
+        return count != 0;
+    }
+
+    protected struct QueueFamilyIndices
+    {
+        public uint? GraphicsFamily;
+        public uint? PresentFamily;
+
+        public bool IsComplete()
+        {
+            return GraphicsFamily.HasValue && PresentFamily.HasValue;
         }
     }
 }

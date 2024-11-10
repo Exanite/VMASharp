@@ -1,107 +1,102 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Numerics;
-
 using Silk.NET.Vulkan;
+using VMASharp;
 
-namespace VulkanCube
+namespace VulkanCube;
+
+public abstract unsafe class DescriptorSetExample : LayoutsExample
 {
-    public unsafe abstract class DescriptorSetExample : LayoutsExample
+    protected readonly DescriptorPool DescriptorPool;
+    protected readonly DescriptorSet[] DescriptorSets;
+
+    protected DescriptorSetExample()
     {
-        protected readonly DescriptorPool DescriptorPool;
-        protected readonly DescriptorSet[] DescriptorSets;
+        DescriptorPool = CreateDescriptorPool();
 
-        protected DescriptorSetExample() : base()
+        DescriptorSets = AllocateDescriptorSets();
+
+        var info = new DescriptorBufferInfo
         {
-            this.DescriptorPool = CreateDescriptorPool();
+            Buffer = UniformBuffer,
+            Offset = 0,
+            Range = UniformBufferSize,
+        };
 
-            this.DescriptorSets = AllocateDescriptorSets();
+        var write = new WriteDescriptorSet
+        {
+            SType = StructureType.WriteDescriptorSet,
+            DstSet = DescriptorSets[0],
+            DescriptorCount = 1,
+            DescriptorType = DescriptorType.UniformBuffer,
+            PBufferInfo = &info,
+            DstArrayElement = 0,
+            DstBinding = 0,
+        };
 
-            DescriptorBufferInfo info = new DescriptorBufferInfo
-            {
-                Buffer = UniformBuffer,
-                Offset = 0,
-                Range = this.UniformBufferSize
-            };
+        VkApi.UpdateDescriptorSets(Device, 1, &write, 0, null);
+    }
 
-            WriteDescriptorSet write = new WriteDescriptorSet
-            {
-                SType = StructureType.WriteDescriptorSet,
-                DstSet = this.DescriptorSets[0],
-                DescriptorCount = 1,
-                DescriptorType = DescriptorType.UniformBuffer,
-                PBufferInfo = &info,
-                DstArrayElement = 0,
-                DstBinding = 0
-            };
+    public override void Dispose()
+    {
+        VkApi.FreeDescriptorSets(Device, DescriptorPool, (uint)DescriptorSets.Length, in DescriptorSets[0]);
 
-            VkApi.UpdateDescriptorSets(this.Device, 1, &write, 0, null);
+        VkApi.DestroyDescriptorPool(Device, DescriptorPool, null);
+
+        base.Dispose();
+    }
+
+    private DescriptorPool CreateDescriptorPool()
+    {
+        var typeCount = new DescriptorPoolSize
+        {
+            Type = DescriptorType.UniformBuffer,
+            DescriptorCount = 1,
+        };
+
+        var createInfo = new DescriptorPoolCreateInfo
+        {
+            SType = StructureType.DescriptorPoolCreateInfo,
+            MaxSets = 1,
+            PoolSizeCount = 1,
+            PPoolSizes = &typeCount,
+            Flags = DescriptorPoolCreateFlags.DescriptorPoolCreateFreeDescriptorSetBit,
+        };
+
+        DescriptorPool pool;
+
+        var res = VkApi.CreateDescriptorPool(Device, &createInfo, null, &pool);
+
+        if (res != Result.Success)
+        {
+            throw new VulkanResultException("Failed to create Descriptor Pool!", res);
         }
 
-        public override void Dispose()
+        return pool;
+    }
+
+    private DescriptorSet[] AllocateDescriptorSets()
+    {
+        fixed (DescriptorSetLayout* pLayouts = DescriptorSetLayouts)
         {
-            VkApi.FreeDescriptorSets(this.Device, this.DescriptorPool, (uint)this.DescriptorSets.Length, in DescriptorSets[0]);
-
-            VkApi.DestroyDescriptorPool(this.Device, this.DescriptorPool, null);
-
-            base.Dispose();
-        }
-
-        private DescriptorPool CreateDescriptorPool()
-        {
-            DescriptorPoolSize typeCount = new DescriptorPoolSize
+            var allocInfo = new DescriptorSetAllocateInfo
             {
-                Type = DescriptorType.UniformBuffer,
-                DescriptorCount = 1
+                SType = StructureType.DescriptorSetAllocateInfo,
+                DescriptorPool = DescriptorPool,
+                DescriptorSetCount = (uint)DescriptorSetLayouts.Length,
+                PSetLayouts = pLayouts,
             };
 
-            DescriptorPoolCreateInfo createInfo = new DescriptorPoolCreateInfo
+            var arr = new DescriptorSet[DescriptorSetLayouts.Length];
+
+            fixed (DescriptorSet* pSets = arr)
             {
-                SType = StructureType.DescriptorPoolCreateInfo,
-                MaxSets = 1,
-                PoolSizeCount = 1,
-                PPoolSizes = &typeCount,
-                Flags = DescriptorPoolCreateFlags.DescriptorPoolCreateFreeDescriptorSetBit
-            };
+                var res = VkApi.AllocateDescriptorSets(Device, &allocInfo, pSets);
 
-            DescriptorPool pool;
-
-            var res = VkApi.CreateDescriptorPool(this.Device, &createInfo, null, &pool);
-
-            if (res != Result.Success)
-            {
-                throw new VMASharp.VulkanResultException("Failed to create Descriptor Pool!", res);
-            }
-
-            return pool;
-        }
-
-        private DescriptorSet[] AllocateDescriptorSets()
-        {
-            fixed (DescriptorSetLayout* pLayouts = this.DescriptorSetLayouts)
-            {
-                DescriptorSetAllocateInfo allocInfo = new DescriptorSetAllocateInfo
+                if (res != Result.Success)
                 {
-                    SType = StructureType.DescriptorSetAllocateInfo,
-                    DescriptorPool = this.DescriptorPool,
-                    DescriptorSetCount = (uint)this.DescriptorSetLayouts.Length,
-                    PSetLayouts = pLayouts
-                };
-
-                var arr = new DescriptorSet[this.DescriptorSetLayouts.Length];
-
-                fixed (DescriptorSet* pSets = arr)
-                {
-                    var res = VkApi.AllocateDescriptorSets(this.Device, &allocInfo, pSets);
-
-                    if (res != Result.Success)
-                    {
-                        throw new VMASharp.VulkanResultException("Failed to allocate Descriptor Sets!", res);
-                    }
-
-                    return arr;
+                    throw new VulkanResultException("Failed to allocate Descriptor Sets!", res);
                 }
+
+                return arr;
             }
         }
     }

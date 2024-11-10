@@ -19,7 +19,6 @@ public enum MemoryUsage
     ///     - Resources transferred from host once (immutable) or infrequently and read by
     ///       device multiple times, e.g. textures to be sampled, vertex buffers, uniform
     ///       (constant) buffers, and majority of other types of resources used on GPU.
-    /// 
     /// Allocation may still end up in `HOST_VISIBLE` memory on some implementations.
     /// In such case, you are free to map it.
     /// You can use #VMA_ALLOCATION_CREATE_MAPPED_BIT with this usage type.
@@ -44,7 +43,8 @@ public enum MemoryUsage
     /// CPU access is typically uncached. Writes may be write-combined.
     /// </summary>
     /// <remarks>
-    /// Usage: Resources written frequently by host (dynamic), read by device. E.g. textures, vertex buffers, uniform buffers updated every frame or every draw call.
+    /// Usage: Resources written frequently by host (dynamic), read by device. E.g. textures, vertex buffers, uniform buffers
+    /// updated every frame or every draw call.
     /// </remarks>
     CPU_To_GPU,
 
@@ -54,8 +54,10 @@ public enum MemoryUsage
     /// </summary>
     /// <remarks>
     /// Usage:
-    ///     - Resources written by device, read by host - results of some computations, e.g. screen capture, average scene luminance for HDR tone mapping.
-    ///     - Any resources read or accessed randomly on host, e.g. CPU-side copy of vertex buffer used as source of transfer, but also used for collision detection.
+    ///     - Resources written by device, read by host - results of some computations, e.g. screen capture, average scene
+    /// luminance for HDR tone mapping.
+    ///     - Any resources read or accessed randomly on host, e.g. CPU-side copy of vertex buffer used as source of transfer,
+    /// but also used for collision detection.
     /// </remarks>
     GPU_To_CPU,
 
@@ -70,11 +72,13 @@ public enum MemoryUsage
 
     /// <summary>
     /// Lazily allocated GPU memory having `VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT`.
-    /// Exists mostly on mobile platforms. Using it on desktop PC or other GPUs with no such memory type present will fail the allocation.
+    /// Exists mostly on mobile platforms. Using it on desktop PC or other GPUs with no such memory type present will fail the
+    /// allocation.
     /// Allocations with this usage are always created as dedicated - it implies #VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT.
     /// </summary>
     /// <remarks>
-    /// Usage: Memory for transient attachment images (color attachments, depth attachments etc.), created with `VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT`.
+    /// Usage: Memory for transient attachment images (color attachments, depth attachments etc.), created with
+    /// `VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT`.
     /// </remarks>
     GPU_LazilyAllocated,
 }

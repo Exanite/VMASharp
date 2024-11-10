@@ -1,18 +1,20 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
+using System.Threading;
 using Silk.NET.Vulkan;
 
 namespace VMASharp;
 
 internal class CurrentBudgetData
 {
-    public readonly InternalBudgetStruct[] BudgetData  = new InternalBudgetStruct[Vk.MaxMemoryHeaps];
-    public readonly ReaderWriterLockSlim   BudgetMutex = new();
-    public          int                    OperationsSinceBudgetFetch;
+    public readonly InternalBudgetStruct[] BudgetData = new InternalBudgetStruct[Vk.MaxMemoryHeaps];
+    public readonly ReaderWriterLockSlim BudgetMutex = new();
+    public int OperationsSinceBudgetFetch;
 
-    public CurrentBudgetData() { }
-
-    public void AddAllocation(int heapIndex, long allocationSize) {
-        if ((uint)heapIndex >= Vk.MaxMemoryHeaps) {
+    public void AddAllocation(int heapIndex, long allocationSize)
+    {
+        if ((uint)heapIndex >= Vk.MaxMemoryHeaps)
+        {
             throw new ArgumentOutOfRangeException(nameof(heapIndex));
         }
 
@@ -20,8 +22,9 @@ internal class CurrentBudgetData
         Interlocked.Increment(ref OperationsSinceBudgetFetch);
     }
 
-    public void RemoveAllocation(int heapIndex, long allocationSize) {
-        ref InternalBudgetStruct heap = ref BudgetData[heapIndex];
+    public void RemoveAllocation(int heapIndex, long allocationSize)
+    {
+        ref var heap = ref BudgetData[heapIndex];
 
         Debug.Assert(heap.AllocationBytes >= allocationSize);
 

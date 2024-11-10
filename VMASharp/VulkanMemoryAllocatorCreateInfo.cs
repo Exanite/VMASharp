@@ -1,5 +1,4 @@
-﻿using Silk.NET.Core;
-using Silk.NET.Vulkan;
+﻿using Silk.NET.Vulkan;
 
 #pragma warning disable CA1815
 
@@ -28,13 +27,17 @@ public struct VulkanMemoryAllocatorCreateInfo
 
     public int FrameInUseCount;
 
-    public VulkanMemoryAllocatorCreateInfo(Version32 vulkanApiVersion,
+    public VulkanMemoryAllocatorCreateInfo(
+        Version32 vulkanApiVersion,
         Vk vulkanApiObject,
-        Instance instance, PhysicalDevice physicalDevice, Device logicalDevice,
+        Instance instance,
+        PhysicalDevice physicalDevice,
+        Device logicalDevice,
         AllocatorCreateFlags flags = default,
         long preferredLargeHeapBlockSize = 0,
         long[]? heapSizeLimits = null,
-        int frameInUseCount = 0) {
+        int frameInUseCount = 0)
+    {
         Flags = flags;
         VulkanApiVersion = vulkanApiVersion;
         VulkanApiObject = vulkanApiObject;

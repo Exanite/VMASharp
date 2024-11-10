@@ -10,5 +10,5 @@ internal struct BlockDefragmentationContext
     }
 
     public BlockFlags Flags;
-    public Buffer     Buffer;
+    public Buffer Buffer;
 }

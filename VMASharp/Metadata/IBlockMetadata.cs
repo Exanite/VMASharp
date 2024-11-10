@@ -1,7 +1,7 @@
 ﻿namespace VMASharp.Metadata;
 
 /// <summary>
-/// Allocation book-keeping for individual Device Memory Blocks. 
+/// Allocation book-keeping for individual Device Memory Blocks.
 /// </summary>
 public interface IBlockMetadata
 {
@@ -21,7 +21,6 @@ public interface IBlockMetadata
     long SumFreeSize { get; }
 
     /// <summary>
-    /// 
     /// </summary>
     long UnusedRangeSizeMax { get; }
 

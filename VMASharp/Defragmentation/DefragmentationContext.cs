@@ -1,9 +1,8 @@
-﻿using JetBrains.Annotations;
+﻿using System;
+using System.Collections.Generic;
 using Silk.NET.Vulkan;
 
-namespace VMASharp.Defragmentation;
 
-[PublicAPI]
 public sealed class DefragmentationContext : IDisposable
 {
     private readonly VulkanMemoryAllocator _allocator;
