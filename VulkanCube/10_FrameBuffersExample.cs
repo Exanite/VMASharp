@@ -3,7 +3,7 @@ using VMASharp;
 
 namespace VulkanCube;
 
-public unsafe abstract class FrameBuffersExample : ShaderModulesExample
+public abstract unsafe class FrameBuffersExample : ShaderModulesExample
 {
     protected readonly Framebuffer[] FrameBuffers;
 

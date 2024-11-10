@@ -3,7 +3,7 @@ using VMASharp;
 
 namespace VulkanCube;
 
-public unsafe abstract class RenderPassExample : DescriptorSetExample
+public abstract unsafe class RenderPassExample : DescriptorSetExample
 {
     protected readonly RenderPass RenderPass;
 

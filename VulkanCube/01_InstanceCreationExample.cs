@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Silk.NET.Core;
 using Silk.NET.Core.Native;
 using Silk.NET.Vulkan;
+using Silk.NET.Vulkan.Extensions.EXT;
 using Silk.NET.Vulkan.Extensions.KHR;
 using Silk.NET.Windowing;
 using VMASharp;
@@ -74,7 +75,7 @@ public abstract unsafe class InstanceCreationExample : ExampleBase
 
         var extensions = new List<string>(GetWindowExtensions())
         {
-            Debugging.DebugExtensionString,
+            ExtDebugUtils.ExtensionName,
         };
 
         string[] layers = { "VK_LAYER_KHRONOS_validation" };

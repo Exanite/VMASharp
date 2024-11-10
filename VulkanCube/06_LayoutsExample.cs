@@ -5,7 +5,7 @@ namespace VulkanCube;
 
 /// <summary>
 /// </summary>
-public unsafe abstract class LayoutsExample : AllocatorAndBuffersExample
+public abstract unsafe class LayoutsExample : AllocatorAndBuffersExample
 {
     protected readonly DescriptorSetLayout[] DescriptorSetLayouts;
     protected readonly PipelineLayout GraphicsPipelineLayout;

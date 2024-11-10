@@ -7,7 +7,7 @@ using VMASharp;
 
 namespace VulkanCube;
 
-public unsafe abstract class DeviceCreationExample : InstanceCreationExample
+public abstract unsafe class DeviceCreationExample : InstanceCreationExample
 {
     private static readonly string[] RequiredDeviceExtensions = { "VK_KHR_swapchain" };
 

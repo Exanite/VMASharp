@@ -5,7 +5,7 @@ using VMASharp;
 
 namespace VulkanCube;
 
-public unsafe abstract class SwapchainCreationExample : DeviceCreationExample
+public abstract unsafe class SwapchainCreationExample : DeviceCreationExample
 {
     protected readonly SwapchainKHR Swapchain;
     protected readonly Extent2D SwapchainExtent;

@@ -5,7 +5,7 @@ using VMASharp;
 
 namespace VulkanCube;
 
-public unsafe abstract class GraphicsPipelineExample : FrameBuffersExample
+public abstract unsafe class GraphicsPipelineExample : FrameBuffersExample
 {
     protected readonly Pipeline GraphicsPipeline;
 

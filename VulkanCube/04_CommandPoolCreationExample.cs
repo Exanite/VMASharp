@@ -4,7 +4,7 @@ using VMASharp;
 
 namespace VulkanCube;
 
-public unsafe abstract class CommandPoolCreationExample : SwapchainCreationExample
+public abstract unsafe class CommandPoolCreationExample : SwapchainCreationExample
 {
     protected readonly CommandPool CommandPool;
 

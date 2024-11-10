@@ -1,7 +1,9 @@
 ﻿#pragma warning disable CA1063
 
+using System;
 using System.Buffers;
 using System.Diagnostics;
+using System.Threading;
 using Silk.NET.Vulkan;
 using Buffer = Silk.NET.Vulkan.Buffer;
 

@@ -682,7 +682,7 @@ internal class BlockList : IDisposable
         MemoryAllocateFlagsInfoKHR allocFlagsInfo = new(StructureType.MemoryAllocateFlagsInfoKhr);
         if (Allocator.UseKhrBufferDeviceAddress)
         {
-            allocFlagsInfo.Flags = MemoryAllocateFlags.AddressBitKhr;
+            allocFlagsInfo.Flags = MemoryAllocateFlags.MemoryAllocateDeviceAddressBitKhr;
             info.PNext = &allocFlagsInfo;
         }
 

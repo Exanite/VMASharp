@@ -6,6 +6,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
+using Silk.NET.Core;
 using Silk.NET.Vulkan;
 using VMASharp.Defragmentation;
 using Buffer = Silk.NET.Vulkan.Buffer;
@@ -608,8 +609,8 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
         VkApi.GetBufferMemoryRequirements2(Device, &req, &memReq2);
 
         memReq = memReq2.MemoryRequirements;
-        requiresDedicatedAllocation = dedicatedRequirements.RequiresDedicatedAllocation != 0;
-        prefersDedicatedAllocation = dedicatedRequirements.PrefersDedicatedAllocation != 0;
+        requiresDedicatedAllocation = dedicatedRequirements.RequiresDedicatedAllocation;
+        prefersDedicatedAllocation = dedicatedRequirements.PrefersDedicatedAllocation;
     }
 
     internal void GetImageMemoryRequirements(
@@ -638,8 +639,8 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
         VkApi.GetImageMemoryRequirements2(Device, &req, &memReq2);
 
         memReq = memReq2.MemoryRequirements;
-        requiresDedicatedAllocation = dedicatedRequirements.RequiresDedicatedAllocation != 0;
-        prefersDedicatedAllocation = dedicatedRequirements.PrefersDedicatedAllocation != 0;
+        requiresDedicatedAllocation = dedicatedRequirements.RequiresDedicatedAllocation;
+        prefersDedicatedAllocation = dedicatedRequirements.PrefersDedicatedAllocation;
     }
 
     internal Allocation AllocateMemory(
@@ -872,7 +873,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
             outBudget.AllocationBytes = heapBudget.AllocationBytes;
 
             outBudget.Usage = heapBudget.BlockBytes;
-            outBudget.Budget = _memoryProperties.MemoryHeaps[heapIndex].Size * 8 / 10; //80% heuristics
+            outBudget.Budget = (long)(_memoryProperties.MemoryHeaps[heapIndex].Size * 8 / 10); // 80% heuristics
         }
     }
 
@@ -937,7 +938,7 @@ public sealed unsafe class VulkanMemoryAllocator : IDisposable
                 outBudget.AllocationBytes = heapBudget.AllocationBytes;
 
                 outBudget.Usage = heapBudget.BlockBytes;
-                outBudget.Budget = _memoryProperties.MemoryHeaps[heapIndex].Size * 8 / 10; //80% heuristics
+                outBudget.Budget = (long)(_memoryProperties.MemoryHeaps[heapIndex].Size * 8 / 10); //80% heuristics
             }
         }
     }

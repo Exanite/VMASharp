@@ -5,7 +5,7 @@ using VMASharp;
 
 namespace VulkanCube;
 
-public unsafe abstract class ShaderModulesExample : RenderPassExample
+public abstract unsafe class ShaderModulesExample : RenderPassExample
 {
     protected ShaderModule VertexShader, FragmentShader;
 
